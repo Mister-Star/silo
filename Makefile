@@ -80,7 +80,8 @@ CXXFLAGS += -MD -Ithird-party/lz4 -DCONFIG_H=\"$(CONFIG_H)\"
 ifeq ($(DEBUG_S),1)
         CXXFLAGS += -fno-omit-frame-pointer -DDEBUG
 else
-        CXXFLAGS += -Werror -O2 -funroll-loops -fno-omit-frame-pointer
+#        CXXFLAGS += -Werror -O2 -funroll-loops -fno-omit-frame-pointer
+		CXXFLAGS += -O2 -funroll-loops -fno-omit-frame-pointer
 endif
 ifeq ($(CHECK_INVARIANTS_S),1)
 	CXXFLAGS += -DCHECK_INVARIANTS
@@ -134,7 +135,17 @@ SRCFILES = allocator.cc \
 	txn_btree.cc \
 	txn.cc \
 	txn_proto2_impl.cc \
-	varint.cc
+	varint.cc \
+	CRDT/atomic_counters.cpp \
+	CRDT/atomic_counters_cache.cpp \
+	CRDT/crdt_context.cpp \
+	CRDT/crdt_counters.cpp \
+	CRDT/crdt_transaction.cpp \
+	CRDT/crdt_utils.cpp \
+	CRDT/merge.cpp \
+	CRDT/epoch_manager.cpp \
+	CRDT/tinyxml2.cpp \
+
 
 ifeq ($(MASSTREE_S),1)
 MASSTREE_SRCFILES = masstree/compiler.cc \
@@ -170,6 +181,30 @@ endif
 
 BENCH_OBJFILES := $(patsubst %.cc, $(O)/%.o, $(BENCH_SRCFILES))
 
+#CRDT_BENCH zwx
+CRDTBENCH_CXXFLAGS := $(CXXFLAGS)
+CRDTBENCH_LDFLAGS := $(LDFLAGS) -ldb_cxx -lz -lrt -lcrypt -laio -ldl -lssl -lcrypto
+
+CRDTBENCH_SRCFILES = CRDT_bench/bdb_wrapper.cc \
+	CRDT_bench/bench.cc \
+	CRDT_bench/encstress.cc \
+	CRDT_bench/bid.cc \
+	CRDT_bench/masstree/kvrandom.cc \
+	CRDT_bench/queue.cc \
+	CRDT_bench/tpcc.cc \
+	CRDT_bench/ycsb.cc
+
+ifeq ($(MYSQL_S),1)
+CRDTBENCH_CXXFLAGS += -DMYSQL_SHARE_DIR=\"$(MYSQL_SHARE_DIR)\"
+CRDTBENCH_LDFLAGS := -L/usr/lib/mysql -lmysqld $(CRDTBENCH_LDFLAGS)
+CRDTBENCH_SRCFILES += CRDT_bench/mysql_wrapper.cc
+else
+CRDTBENCH_CXXFLAGS += -DNO_MYSQL
+endif
+
+CRDTBENCH_OBJFILES := $(patsubst %.cc, $(O)/%.o, $(CRDTBENCH_SRCFILES))
+
+
 NEWBENCH_SRCFILES = new-benchmarks/bench.cc \
 	new-benchmarks/tpcc.cc
 
@@ -180,6 +215,10 @@ all: $(O)/test
 $(O)/benchmarks/%.o: benchmarks/%.cc $(O)/buildstamp $(O)/buildstamp.bench $(OBJDEP)
 	@mkdir -p $(@D)
 	$(CXX) $(BENCH_CXXFLAGS) -c $< -o $@
+
+$(O)/CRDT_bench/%.o: CRDT_bench/%.cc $(O)/buildstamp $(O)/buildstamp.bench $(OBJDEP)
+	@mkdir -p $(@D)
+	$(CXX) $(CRDTBENCH_CXXFLAGS) -c $< -o $@
 
 $(O)/benchmarks/masstree/%.o: benchmarks/masstree/%.cc $(O)/buildstamp $(O)/buildstamp.bench $(OBJDEP)
 	@mkdir -p $(@D)
@@ -231,6 +270,12 @@ dbtest: $(O)/benchmarks/dbtest
 
 $(O)/benchmarks/dbtest: $(O)/benchmarks/dbtest.o $(OBJFILES) $(MASSTREE_OBJFILES) $(BENCH_OBJFILES) third-party/lz4/liblz4.so
 	$(CXX) -o $(O)/benchmarks/dbtest $^ $(BENCH_LDFLAGS) $(LZ4LDFLAGS)
+
+.PHONY: crdt_dbtest
+crdt_dbtest: $(O)/CRDT_bench/crdt_dbtest
+
+$(O)/CRDT_bench/crdt_dbtest: $(O)/CRDT_bench/crdt_dbtest.o $(OBJFILES) $(MASSTREE_OBJFILES) $(CRDTBENCH_OBJFILES) third-party/lz4/liblz4.so
+	$(CXX) -o $(O)/CRDT_bench/crdt_dbtest $^ $(CRDTBENCH_LDFLAGS) $(LZ4LDFLAGS)
 
 .PHONY: kvtest
 kvtest: $(O)/benchmarks/masstree/kvtest

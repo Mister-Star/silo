@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+    <epoch_size_us>10000</epoch_size_us><!-- us -->
+    <cache_max_length>10000</cache_max_length> <!-- 10 min  600s 600000ms 60000 epochs-->
+
+    <shard_num>11</shard_num>
+    <merge_thread_num>14</merge_thread_num> <!--handle txn merge-->
+    <glog_path>/tmp</glog_path>
+    <print_mode_size>10</print_mode_size>
+
+    <isolation>3</isolation><!-- 1:RC 2:RR 3:SI 4:SER -->
+</root>
