@@ -52,6 +52,8 @@ public:
         commit_complete, record_committed, result_returned,
         is_current_epoch_abort;
 
+
+
     static void SetTimerStop(bool value) {timerStop = value;}
     static bool IsTimerStop() {return timerStop;}
 

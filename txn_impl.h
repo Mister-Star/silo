@@ -6,15 +6,15 @@
 
 // base definitions
 
-template <template <typename> class Protocol, typename Traits>
-transaction<Protocol, Traits>::transaction(uint64_t flags, string_allocator_type &sa)
-  : transaction_base(flags), sa(&sa)
-{
-  INVARIANT(rcu::s_instance.in_rcu_region());
-#ifdef BTREE_LOCK_OWNERSHIP_CHECKING
-  concurrent_btree::NodeLockRegionBegin();
-#endif
-}
+//template <template <typename> class Protocol, typename Traits>
+//transaction<Protocol, Traits>::transaction(uint64_t flags, string_allocator_type &sa)
+//  : transaction_base(flags), sa(&sa)
+//{
+//  INVARIANT(rcu::s_instance.in_rcu_region());
+//#ifdef BTREE_LOCK_OWNERSHIP_CHECKING
+//  concurrent_btree::NodeLockRegionBegin();
+//#endif
+//}
 
 template <template <typename> class Protocol, typename Traits>
 transaction<Protocol, Traits>::~transaction()
@@ -25,10 +25,16 @@ transaction<Protocol, Traits>::~transaction()
   INVARIANT(rcu::s_instance.in_rcu_region());
   const unsigned cur_depth = rcu_guard_->sync()->depth();
   rcu_guard_.destroy();
-  if (cur_depth == 1) {
-    INVARIANT(!rcu::s_instance.in_rcu_region());
-    cast()->on_post_rcu_region_completion();
-  }
+//  if (cur_depth == 1) {
+//    INVARIANT(!rcu::s_instance.in_rcu_region());
+//    cast()->on_post_rcu_region_completion();
+//  }
+
+//addby
+    if (node) {
+        CoreIdArena::recollect(node);
+        ::free(txn_buf);
+    }
 #ifdef BTREE_LOCK_OWNERSHIP_CHECKING
   concurrent_btree::AssertAllNodeLocksReleased();
 #endif

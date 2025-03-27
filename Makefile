@@ -75,7 +75,8 @@ else
 	$(error invalid mode)
 endif
 
-CXXFLAGS := -g -Wall -std=c++0x
+#CXXFLAGS := -g -Wall -std=c++0x
+CXXFLAGS := -g -Wall -std=c++14
 CXXFLAGS += -MD -Ithird-party/lz4 -DCONFIG_H=\"$(CONFIG_H)\"
 ifeq ($(DEBUG_S),1)
         CXXFLAGS += -fno-omit-frame-pointer -DDEBUG
@@ -125,6 +126,7 @@ endif
 SRCFILES = allocator.cc \
 	btree.cc \
 	core.cc \
+	coreid_arena.cc \
 	counter.cc \
 	memory.cc \
 	rcu.cc \

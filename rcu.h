@@ -261,6 +261,9 @@ public:
   // CPU-specific
   void pin_current_thread(size_t cpu);
 
+    //addby
+  void crdt_pin_thread(size_t cpu);
+
   void fault_region();
 
   static rcu s_instance CACHE_ALIGNED; // system wide instance

@@ -275,25 +275,49 @@ main(int argc, char **argv)
   }
 #endif
 
-  if (db_type == "bdb") {
-    const string cmd = "rm -rf " + basedir + "/db/*";
-    // XXX(stephentu): laziness
-    int ret UNUSED = system(cmd.c_str());
-    db = new bdb_wrapper("db", bench_type + ".db");
-  } else if (db_type == "ndb-proto1") {
-    // XXX: hacky simulation of proto1
-    db = new ndb_wrapper<transaction_proto2>(
-        logfiles, assignments, !nofsync, do_compress, fake_writes);
-    transaction_proto2_static::set_hack_status(true);
-    ALWAYS_ASSERT(transaction_proto2_static::get_hack_status());
-#ifdef PROTO2_CAN_DISABLE_GC
-    if (!disable_gc)
-      transaction_proto2_static::InitGC();
-#endif
-  } else if (db_type == "ndb-proto2") {
-    db = new ndb_wrapper<transaction_proto2>(
-        logfiles, assignments, !nofsync, do_compress, fake_writes);
-    ALWAYS_ASSERT(!transaction_proto2_static::get_hack_status());
+//  if (db_type == "bdb") {
+//    const string cmd = "rm -rf " + basedir + "/db/*";
+//    // XXX(stephentu): laziness
+//    int ret UNUSED = system(cmd.c_str());
+//    db = new bdb_wrapper("db", bench_type + ".db");
+//  } else if (db_type == "ndb-proto1") {
+//    // XXX: hacky simulation of proto1
+//    db = new ndb_wrapper<transaction_proto2>(
+//        logfiles, assignments, !nofsync, do_compress, fake_writes);
+//    transaction_proto2_static::set_hack_status(true);
+//    ALWAYS_ASSERT(transaction_proto2_static::get_hack_status());
+//#ifdef PROTO2_CAN_DISABLE_GC
+//    if (!disable_gc)
+//      transaction_proto2_static::InitGC();
+//#endif
+//  } else if (db_type == "ndb-proto2") {
+//    db = new ndb_wrapper<transaction_proto2>(
+//        logfiles, assignments, !nofsync, do_compress, fake_writes);
+//    ALWAYS_ASSERT(!transaction_proto2_static::get_hack_status());
+//#ifdef PROTO2_CAN_DISABLE_GC
+//    if (!disable_gc)
+//      transaction_proto2_static::InitGC();
+//#endif
+//#ifdef PROTO2_CAN_DISABLE_SNAPSHOTS
+//    if (disable_snapshots)
+//      transaction_proto2_static::DisableSnapshots();
+//#endif
+//  } else if (db_type == "kvdb") {
+//    db = new kvdb_wrapper<true>;
+//  } else if (db_type == "kvdb-st") {
+//    db = new kvdb_wrapper<false>;
+//#if !NO_MYSQL
+//  } else if (db_type == "mysql") {
+//    string dbdir = basedir + "/mysql-db";
+//    db = new mysql_wrapper(dbdir, bench_type);
+//#endif
+//  } else
+//    ALWAYS_ASSERT(false);
+
+    if (db_type == "ndb-proto2") {
+        db = new ndb_wrapper<transaction_proto2>(
+                logfiles, assignments, !nofsync, do_compress, fake_writes);
+        ALWAYS_ASSERT(!transaction_proto2_static::get_hack_status());
 #ifdef PROTO2_CAN_DISABLE_GC
     if (!disable_gc)
       transaction_proto2_static::InitGC();
@@ -302,17 +326,8 @@ main(int argc, char **argv)
     if (disable_snapshots)
       transaction_proto2_static::DisableSnapshots();
 #endif
-  } else if (db_type == "kvdb") {
-    db = new kvdb_wrapper<true>;
-  } else if (db_type == "kvdb-st") {
-    db = new kvdb_wrapper<false>;
-#if !NO_MYSQL
-  } else if (db_type == "mysql") {
-    string dbdir = basedir + "/mysql-db";
-    db = new mysql_wrapper(dbdir, bench_type);
-#endif
-  } else
-    ALWAYS_ASSERT(false);
+    } else
+        ALWAYS_ASSERT(false);
 
 #ifdef DEBUG
   cerr << "WARNING: benchmark built in DEBUG mode!!!" << endl;
