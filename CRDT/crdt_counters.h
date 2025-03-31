@@ -44,6 +44,17 @@ public:
             total_read_version_check_failed_txn_num_vec,
             total_failed_txn_num_vec;
 
+    static AtomicCounters///[[epoch]
+            epoch_should_exec_txn_num,
+            epoch_exec_txn_num;
+//            epoch_should_merge_txn_num,
+//            epoch_merged_txn_num,
+//            epoch_should_commit_txn_num,
+//            epoch_committed_txn_num,
+//            epoch_record_commit_txn_num,
+//            epoch_record_committed_txn_num,
+//            epoch_result_return_txn_num,
+//            epoch_result_returned_txn_num;
 
     static std::vector<std::shared_ptr<std::atomic<bool>>> ///[epoch]
         epoch_read_validate_complete,
@@ -52,12 +63,38 @@ public:
         epoch_record_committed,
         epoch_result_returned;
 
+    static std::vector<std::shared_ptr<std::atomic<uint64_t>>> shard_init_flag;
+
 
     static bool CheckEpochReadValidateComplete(const uint64_t& epoch);
     static bool CheckEpochMergeComplete(const uint64_t& epoch) ;
     static bool CheckEpochCommitComplete(const uint64_t& epoch) ;
     static bool CheckEpochRecordCommitted(const uint64_t& epoch) ;
     static bool CheckEpochResultReturned(const uint64_t& epoch) ;
+
+    static uint64_t IncEpochShouldExecTxnNum(const uint64_t& epoch, uint64_t value) {
+        return epoch_should_exec_txn_num.IncCount(epoch, value);
+    }
+    static uint64_t DecEpochShouldExecTxnNum(const uint64_t& epoch, uint64_t value) {
+        return epoch_should_exec_txn_num.DecCount(epoch, value);
+    }
+    static uint64_t GetEpochShouldExecTxnNum(const uint64_t& epoch, uint64_t value) {
+        return epoch_should_exec_txn_num.GetCount(epoch);
+    }
+
+    static uint64_t IncEpochExecTxnNum(const uint64_t& epoch, uint64_t value) {
+        return epoch_exec_txn_num.IncCount(epoch, value);
+    }
+    static uint64_t DecEpochExecTxnNum(const uint64_t& epoch, uint64_t value) {
+        return epoch_exec_txn_num.DecCount(epoch, value);
+    }
+    static uint64_t GetEpochExecTxnNum(const uint64_t& epoch, uint64_t value) {
+        return epoch_exec_txn_num.GetCount(epoch);
+    }
+
+    static bool CheckEpochExecComplete(const uint64_t& epoch) {
+        return epoch_exec_txn_num.GetCount(epoch) >= epoch_should_exec_txn_num.GetCount(epoch);
+    }
 
     static bool IsReadValidateComplete(const uint64_t& epoch) ;
     static bool IsMergeComplete(const uint64_t& epoch) ;

@@ -832,9 +832,8 @@ public:
     inline transaction(uint64_t flags, string_allocator_type &sa, void *buf = nullptr,
                        CoreIdArena::Node *node = nullptr, int workerId = 0);
 
-    void crdt_shard(void* txn);
-    void crdt_merge(void* txn, int id);
-    bool crdt_commit();
+    bool crdt_commit(void* txn, int shard_id, void* crdt_txn);
+    bool crdt_record_commit(void* txn, int shard_id, void* crdt_txn);
 
     inline
     uint64_t get_csn() {
@@ -861,11 +860,9 @@ public:
         return latancy;
     }
 
-private:
+//private:
 
-    uint64_t sen = 0;
-    uint64_t cen = 0;
-    uint64_t csn = 0;
+    uint64_t tid = 0, sen = 0, cen = 0, csn = 0;
     void *txn_buf;
     CoreIdArena::Node *node;
     bool prepare_fail = false;

@@ -22,10 +22,11 @@ enum IsolationLevel {
 class CRDTContext {
 public:
     static uint64_t kEpochSize_us, kCacheMaxLength, print_mode_size,
-            kShardNum, kMergeThreadNum;
+            kShardNum, kNKeys, kWorkerThreadNum, kMergeThreadNum;
     static IsolationLevel kCRDTIsolation;
+    static uint64_t YCSB_OPs, YCSB_Read, YCSB_Write;
 
-    static void GetCRDTConfig(const std::string &config_file_path = "./CRDT/CRDT_config.xml");
+    static void GetCRDTConfig();
 };
 
 

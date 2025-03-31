@@ -177,7 +177,7 @@ protected:
 
   inline void *txn_buf() { return (void *) txn_obj_buf.data(); }
 
-  unsigned int worker_id;
+  unsigned int worker_id, shard_id;
   bool set_core_id;
   util::fast_random r;
   abstract_db *const db;

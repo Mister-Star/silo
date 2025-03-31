@@ -35,7 +35,7 @@ extern bool CheckRedoLogPushDownState();
 
 extern void EpochLogicalTimerManagerThreadMain();
 extern void EpochPhysicalTimerManagerThreadMain();
-extern void MergeThreadMain(uint64_t shard);
+extern void MergeThreadMain(uint64_t thread_id);
 
 std::string PrintfToString(const char* format, ...);
 void OUTPUTLOG(const std::string& s, uint64_t& epoch);
@@ -105,8 +105,7 @@ public:
     }
 
     static void EpochCacheSafeCheck() {
-        if(((GetLogicalEpoch() % max_length) ==  ((GetPhysicalEpoch() + 55) % max_length)) ||
-           ((GetPushDownEpoch() % max_length) ==  ((GetPhysicalEpoch() + 55) % max_length))) {
+        if(((GetLogicalEpoch() % max_length) ==  ((GetPhysicalEpoch() + 5) % max_length))) {
             uint64_t i = 0;
             OUTPUTLOG("Assert", reinterpret_cast<uint64_t &>(i));
             printf("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
@@ -118,7 +117,7 @@ public:
     }
 
     static bool IsShardInitOK() {
-        return init_ok_num.load() >= CRDTContext::kShardNum;
+        return static_cast<uint64_t>(init_ok_num.load()) >= CRDTContext::kMergeThreadNum + 1;
     }
 
 };

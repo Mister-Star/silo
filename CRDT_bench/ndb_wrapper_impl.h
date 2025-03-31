@@ -30,6 +30,17 @@ struct hint_kv_get_put_traits {
   typedef str_arena StringAllocator;
 };
 
+///addby
+struct hint_kv_txn_traits {
+    static const size_t read_set_expected_size = 10;
+    static const size_t write_set_expected_size = 10;
+    static const size_t absent_set_expected_size = 10;
+    static const bool stable_input_memory = true;
+    static const bool hard_expected_sizes = true;
+    static const bool read_own_writes = false;
+    typedef str_arena StringAllocator;
+};
+
 struct hint_kv_rmw_traits : public hint_kv_get_put_traits {};
 
 struct hint_kv_scan_traits {
@@ -111,6 +122,7 @@ struct hint_tpcc_stock_level_read_only_traits : public hint_read_only_traits {};
 #define TXN_PROFILE_HINT_OP(x) \
   x(abstract_db::HINT_DEFAULT, hint_default_traits) \
   x(abstract_db::HINT_KV_GET_PUT, hint_kv_get_put_traits) \
+  x(abstract_db::HINT_KV_TXN, hint_kv_txn_traits) \
   x(abstract_db::HINT_KV_RMW, hint_kv_rmw_traits) \
   x(abstract_db::HINT_KV_SCAN, hint_kv_scan_traits) \
   x(abstract_db::HINT_TPCC_NEW_ORDER, hint_tpcc_new_order_traits) \
@@ -169,6 +181,7 @@ ndb_wrapper<Transaction>::new_txn(
     void *buf,
     TxnProfileHint hint)
 {
+    std::cerr << "ndb_wrapper_impl.h ndb_wrapper<Transaction>::new_txn" << std::endl;
   ndbtxn * const p = reinterpret_cast<ndbtxn *>(buf);
   p->hint = hint;
 #define MY_OP_X(a, b) \
@@ -197,6 +210,7 @@ template <template <typename> class Transaction>
 bool
 ndb_wrapper<Transaction>::commit_txn(void *txn)
 {
+    std::cerr << "ndb_wrapper_impl.h ndb_wrapper<Transaction>::commit_txn(void *txn)" << std::endl;
   ndbtxn * const p = reinterpret_cast<ndbtxn *>(txn);
 #define MY_OP_X(a, b) \
   case a: \
@@ -214,6 +228,116 @@ ndb_wrapper<Transaction>::commit_txn(void *txn)
 #undef MY_OP_X
   return false;
 }
+
+///addby
+
+template<template<typename> class Transaction>
+int
+ndb_wrapper<Transaction>::get_workerId(void *txn, int id) {
+    ndbtxn *const p = reinterpret_cast<ndbtxn *>(txn);
+#define MY_OP_X(a, b) \
+  case a: \
+    { \
+      auto t = cast< b >()(p); \
+      return t->get_workerId(); \
+    }
+    switch (p->hint) {
+        TXN_PROFILE_HINT_OP(MY_OP_X)
+        default:
+            ALWAYS_ASSERT(false);
+    }
+#undef MY_OP_X
+    return 0;
+}
+
+template<template<typename> class Transaction>
+int
+ndb_wrapper<Transaction>::get_coreId(void *txn, int id) {
+    ndbtxn *const p = reinterpret_cast<ndbtxn *>(txn);
+#define MY_OP_X(a, b) \
+  case a: \
+    { \
+      auto t = cast< b >()(p); \
+      return t->get_coreId(); \
+    }
+    switch (p->hint) {
+        TXN_PROFILE_HINT_OP(MY_OP_X)
+        default:
+            ALWAYS_ASSERT(false);
+    }
+#undef MY_OP_X
+    return 0;
+}
+
+template<template<typename> class Transaction>
+bool
+ndb_wrapper<Transaction>::crdt_commit(void *txn, int shard_id, void *crdt_txn) {
+    ndbtxn *const p = reinterpret_cast<ndbtxn *>(txn);
+#define MY_OP_X(a, b) \
+  case a: \
+    { \
+      auto t = cast< b >()(p); \
+      bool ret = t->crdt_commit(txn, shard_id, crdt_txn); \
+      return ret; \
+    }
+    switch (p->hint) {
+        TXN_PROFILE_HINT_OP(MY_OP_X)
+        default:
+            ALWAYS_ASSERT(false);
+    }
+#undef MY_OP_X
+    return false;
+}
+
+template<template<typename> class Transaction>
+bool
+ndb_wrapper<Transaction>::crdt_record_commit(void *txn, int shard_id, void *crdt_txn) {
+    ndbtxn *const p = reinterpret_cast<ndbtxn *>(txn);
+#define MY_OP_X(a, b) \
+  case a: \
+    { \
+      auto t = cast< b >()(p); \
+      bool ret = t->crdt_record_commit(txn, shard_id, crdt_txn); \
+      return ret; \
+    }
+    switch (p->hint) {
+        TXN_PROFILE_HINT_OP(MY_OP_X)
+        default:
+            ALWAYS_ASSERT(false);
+    }
+#undef MY_OP_X
+    return false;
+}
+
+template<template<typename> class Transaction>
+void
+ndb_wrapper<Transaction>::destroy_txn(void *txn, int id) {
+    ndbtxn *const p = reinterpret_cast<ndbtxn *>(txn);
+#define MY_OP_X(a, b) \
+  case a: \
+    { \
+      auto t = cast< b >()(p); \
+      Destroy(t); \
+      return; \
+    }
+    switch (p->hint) {
+        TXN_PROFILE_HINT_OP(MY_OP_X)
+        default:
+            ALWAYS_ASSERT(false);
+    }
+#undef MY_OP_X
+    return;
+}
+
+template<template<typename> class Transaction>
+void
+ndb_wrapper<Transaction>::register_g_threadctxs() {
+    transaction_proto2_static::Get_g_threadctxs().get(coreid::core_id());
+}
+
+
+
+
 
 template <template <typename> class Transaction>
 void

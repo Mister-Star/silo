@@ -30,12 +30,18 @@ std::vector<std::shared_ptr<AtomicCounters>> ///[shard][epoch]
         CRDTCounters::total_read_version_check_failed_txn_num_vec,
         CRDTCounters::total_failed_txn_num_vec;
 
+AtomicCounters///[[epoch]
+    CRDTCounters::epoch_should_exec_txn_num(10),
+    CRDTCounters::epoch_exec_txn_num(10);
+
 std::vector<std::shared_ptr<std::atomic<bool>>> ///[epoch]
         CRDTCounters::epoch_read_validate_complete,
         CRDTCounters::epoch_merge_complete,
         CRDTCounters::epoch_commit_complete,
         CRDTCounters::epoch_record_committed,
         CRDTCounters::epoch_result_returned;
+
+std::vector<std::shared_ptr<std::atomic<uint64_t>>> CRDTCounters::shard_init_flag;
 
 bool CRDTCounters::StaticInit() {
 
@@ -63,6 +69,9 @@ bool CRDTCounters::StaticInit() {
     total_failed_txn_num_vec.resize(shard_num);
 
     ///epoch merge state
+    epoch_should_exec_txn_num.Resize(max_length); ///[epoch]
+    epoch_exec_txn_num.Resize(max_length); ///[epoch]
+
     epoch_read_validate_complete.resize(max_length); ///[epoch]
     epoch_merge_complete.resize(max_length);
     epoch_commit_complete.resize(max_length);
@@ -75,12 +84,20 @@ bool CRDTCounters::StaticInit() {
         epoch_record_committed[i] = std::make_unique<std::atomic<bool>>(false);
         epoch_result_returned[i] = std::make_unique<std::atomic<bool>>(false);
     }
+
+    shard_init_flag.resize(shard_num);
+    for(int i = 0; i < static_cast<int>(shard_num); i ++) {
+        shard_init_flag[i] = std::make_shared<std::atomic<uint64_t>>(0);
+    }
     return true;
 }
 
 bool CRDTCounters::StaticInitShard(uint64_t& shard) {
+    if(shard_init_flag[shard]->fetch_add(1) != 0)
+        return true;
 
-    ///[shard][epoch]
+    std::cerr << "CRDTCounters::StaticInitShard  shard_id " << shard << std::endl;
+    ///[shard]
     epoch_should_read_validate_txn_num_vec[shard] = std::make_shared<AtomicCounters>(max_length);
     epoch_read_validated_txn_num_vec[shard] = std::make_shared<AtomicCounters>(max_length);
     epoch_should_merge_txn_num_vec[shard] = std::make_shared<AtomicCounters>(max_length);
@@ -101,6 +118,8 @@ bool CRDTCounters::StaticInitShard(uint64_t& shard) {
     total_read_version_check_failed_txn_num_vec[shard] = std::make_shared<AtomicCounters>(max_length);
     total_failed_txn_num_vec[shard] = std::make_shared<AtomicCounters>(max_length);
 
+
+    std::cerr << "CRDTCounters::StaticInitShard  end shard_id " << shard << std::endl;
     return true;
 }
 
@@ -110,6 +129,9 @@ bool CRDTCounters::StaticClear(uint64_t& epoch) {
 
 
     ///Merge
+    epoch_should_exec_txn_num.Clear(epoch); ///[epoch]
+    epoch_exec_txn_num.Clear(epoch); ///[epoch]
+
     epoch_read_validate_complete[epoch_mod_temp]->store(false);
     epoch_merge_complete[epoch_mod_temp]->store(false);
     epoch_commit_complete[epoch_mod_temp]->store(false);

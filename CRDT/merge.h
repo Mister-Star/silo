@@ -42,9 +42,16 @@ public:
         BlockingConcurrentQueue<std::shared_ptr<CRDTTransaction>>>>>>
         epoch_read_validate_queue_vec,
         epoch_merge_queue_vec,///存放要进行merge的事务，分片
-        epoch_commit_queue_vec,
+        epoch_commit_queue_vec, ///存放每个epoch要进行写日志的事务，分片写日志
         epoch_redo_log_queue_vec,
-        epoch_result_return_queue_vec;///存放每个epoch要进行写日志的事务，分片写日志
+        epoch_result_return_queue_vec; ///存放每个epoch要处理结果的full txn
+
+    ///[shard]
+    static std::vector<std::shared_ptr<
+            BlockingConcurrentQueue<std::shared_ptr<CRDTTransaction>>>>
+        epoch_result_returned_queue_vec; ///存放要处理结果的full txn
+
+    static std::vector<std::shared_ptr<std::atomic<uint64_t>>> shard_init_flag;
 
     static void Init();
     static void ShardInit(const uint64_t &shard);
@@ -64,7 +71,7 @@ public:
 public:
 
     uint64_t shard_id, max_length, epoch, epoch_mod;
-    std::string csn_temp, csn_result;
+    std::string csn_temp, csn_result, csn_version;
     std::shared_ptr<CRDTTransaction> txn_ptr;
     bool result, sleep_flag;
 
@@ -114,6 +121,10 @@ public:
         epoch_commit_queue_shard,
         epoch_redo_log_queue_shard,
         epoch_result_return_queue_shard;///存放每个epoch要进行写日志的事务，分片写日志
+
+    std::shared_ptr<
+        BlockingConcurrentQueue<std::shared_ptr<CRDTTransaction>>>
+            epoch_result_returned_queue_shard;
 
     void MergeThreadLocalInit(const uint64_t &shard);
 

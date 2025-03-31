@@ -72,6 +72,7 @@ public:
 
     // ycsb profiles
     HINT_KV_GET_PUT, // KV workloads over a single key
+    HINT_KV_TXN, //addby KV workload do multi_ple rows
     HINT_KV_RMW, // get/put over a single key
     HINT_KV_SCAN, // KV scan workloads (~100 keys)
 

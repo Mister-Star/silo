@@ -10,6 +10,8 @@
 #include <string>
 #include <unordered_map>
 
+#include "crdt_utils.h"
+
 enum OpType{
     Read,
     Update,
@@ -27,17 +29,24 @@ struct CRDTRow {
     OpType op_type;
     std::string key, value;
     std::vector<CRDTColumn> columns;
+    explicit CRDTRow(uint64_t c = 0, OpType o = OpType::Read, std::string k = "", std::string v = ""):
+        csn(c), op_type(o), key(k), value(v){}
 };
+
+
 
 class CRDTTransaction {
 public:
+    explicit CRDTTransaction(uint64_t id = 0, uint64_t se  = 0, uint64_t ce  = 0, uint64_t cs  = 0, void * t = nullptr, bool r = false):
+        tid(id), sen(se), cen(ce), csn(cs), txn(t), result(false) {}
 
-    explicit CRDTTransaction(uint64_t id = 0, uint64_t se  = 0, uint64_t ce  = 0, uint64_t cs  = 0):
-        tid(id),sen(se),cen(ce), csn(cs){}
-
-    uint64_t tid, sen, cen, csn;
+    uint64_t tid{}, sen{}, cen{}, csn{};
     std::unordered_map<std::string, CRDTRow> read_set, write_set;
 
+    Timer t;
+
+    void * txn;
+    bool result;
 };
 
 

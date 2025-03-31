@@ -13,8 +13,50 @@
 #include <atomic>
 #include <mutex>
 #include <unistd.h>
+#include <sys/time.h>
+#include <time.h>
 
 uint64_t now_to_us();
+
+class Timer {
+private:
+    Timer(const Timer &) = delete;
+    Timer &operator=(const Timer &) = delete;
+    Timer(Timer &&) = delete;
+
+public:
+    Timer()
+    {
+        lap();
+    }
+
+    inline uint64_t
+    lap()
+    {
+        uint64_t t0 = start;
+        uint64_t t1 = cur_usec();
+        start = t1;
+        return t1 - t0;
+    }
+
+    inline double
+    lap_ms()
+    {
+        return lap() / 1000.0;
+    }
+
+    static inline uint64_t
+    cur_usec()
+    {
+        struct timeval tv;
+        gettimeofday(&tv, 0);
+        return ((uint64_t)tv.tv_sec) * 1000000 + tv.tv_usec;
+    }
+
+private:
+
+    uint64_t start;
+};
 
 template<typename key, typename value>
 class concurrent_unordered_map {

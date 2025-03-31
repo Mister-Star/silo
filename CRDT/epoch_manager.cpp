@@ -27,18 +27,14 @@ std::atomic<bool> is_epoch_advance_started(false), test_start(false);
 
 
 uint64_t last_total_commit_txn_num = 0, total_commit_txn_num = 0;
-const uint64_t sleep_time = 100, logical_sleep_timme = 100, storage_sleep_time = 100, merge_sleep_time = 100, message_sleep_time = 50;
+const uint64_t sleep_time = 10, logical_sleep_timme = 10, storage_sleep_time = 10, merge_sleep_time = 10, message_sleep_time = 10;
 std::atomic<uint64_t> merge_epoch = 1, abort_set_epoch = 1,
         commit_epoch = 1, redo_log_epoch = 1, clear_epoch = 1;
 
 void InitEpochTimerManager(){
+    std::cerr << "EpochPhysicalThread start StaticEpochInit  " << std::endl;
     Merge::Init();
     CRDTCounters::StaticInit();
-
-    for(uint64_t i = 0; i < CRDTContext::kShardNum; i ++) {
-        Merge::ShardInit(i);
-        CRDTCounters::StaticInitShard(i);
-    }
 
     EpochManager::max_length = CRDTContext::kCacheMaxLength;
     //==========Logical Epoch Merge State=============
@@ -58,6 +54,8 @@ void InitEpochTimerManager(){
         EpochManager::is_current_epoch_abort[i] = std::make_unique<std::atomic<bool>>(false);
 
     }
+
+    std::cerr << "EpochPhysicalThread finish StaticEpochInit  " << std::endl;
     init_ok_num.fetch_add(1);
 }
 
@@ -120,9 +118,15 @@ void OUTPUTLOG(const std::string& s, uint64_t& epoch_){
 }
 
 void EpochPhysicalTimerManagerThreadMain() {
+    std::string name = "EpochPhysical";
+    pthread_setname_np(pthread_self(), name.substr(0, 15).c_str());
+    std::cerr << "EpochPhysicalTimerManagerThreadMain  " << std::endl;
     InitEpochTimerManager();
-    while(!EpochManager::IsShardInitOK()) usleep(sleep_time);
-    //==========同步============
+    while(!EpochManager::IsShardInitOK()) std::this_thread::yield();
+
+    gettimeofday(&start_time, nullptr);
+    start_time_ll = start_time.tv_sec * 1000000 + start_time.tv_usec;
+
     EpochManager::SetPhysicalEpoch(1);
     EpochManager::SetLogicalEpoch(1);
     auto epoch_ = EpochManager::GetPhysicalEpoch();
@@ -130,10 +134,12 @@ void EpochPhysicalTimerManagerThreadMain() {
     test_start.store(true);
     is_epoch_advance_started.store(true);
 
-    printf("=============  EpochTimerManager 同步完成，数据库开始正常运行 ============= \n");
+    printf("=============  EpochManager Init 完成，数据库开始正常运行 ============= \n");
 
     while(!EpochManager::IsTimerStop()){
-        usleep(GetSleeptime());
+        auto sleep_time_ = GetSleeptime();
+        std::cerr << "physical sleep_time " << sleep_time_ << std::endl;
+        usleep(sleep_time_);
         EpochManager::AddPhysicalEpoch();
         epoch_ ++;
         logical = EpochManager::GetLogicalEpoch();
@@ -147,35 +153,66 @@ void EpochPhysicalTimerManagerThreadMain() {
 }
 
 
-void MergeThreadMain(uint64_t shard) {
-    while(!EpochManager::IsShardInitOK()) usleep(sleep_time);
+void MergeThreadMain(uint64_t thread_id) {
+    std::string name = "EpochMerge" + std::to_string(thread_id);
+    pthread_setname_np(pthread_self(), name.substr(0, 15).c_str());
+    std::cerr << "MergeThreadMain  " << thread_id << std::endl;
+    while(init_ok_num.load() < 1) std::this_thread::yield();
+    auto shard_id = thread_id % CRDTContext::kShardNum;
+    std::cerr << "thread start shardStatic init  " << thread_id  << " shard_id " << shard_id<< std::endl;
+    Merge::ShardInit(shard_id);
+    CRDTCounters::StaticInitShard(shard_id);
+    std::cerr << "thread shardStatic init  finished" << thread_id << " shard_id " << shard_id<< std::endl;
+    init_ok_num.fetch_add(1);
+    while(!EpochManager::IsShardInitOK()) std::this_thread::yield();
+    std::cerr << "thread MergeThreadLocalInit  " << thread_id << std::endl;
     Merge merge;
-    merge.MergeThreadLocalInit(shard);
+    merge.MergeThreadLocalInit(shard_id);
+    std::cerr << "EpochMerge  " << thread_id << std::endl;
     merge.EpochMerge();
 }
 
 void EpochLogicalTimerManagerThreadMain() {
-    while(!EpochManager::IsShardInitOK()) usleep(sleep_time);
+    std::string name = "EpochLogical";
+    pthread_setname_np(pthread_self(), name.substr(0, 15).c_str());
+    std::cerr << "EpochLogicalTimerManagerThreadMain  " << std::endl;
+    while(!EpochManager::IsShardInitOK()) std::this_thread::yield();
     uint64_t epoch = 1;
     OUTPUTLOG("===== Logical Start Epoch的合并 ===== ", epoch);
     while(!EpochManager::IsShardInitOK()) usleep(logical_sleep_timme);
     while(!EpochManager::IsTimerStop()){
         auto time1 = now_to_us();
-        while(epoch >= EpochManager::GetPhysicalEpoch()) usleep(logical_sleep_timme);
+//        std::cerr << "epoch >= EpochManager::GetPhysicalEpoch() " << epoch << std::endl;
+        while(epoch >= EpochManager::GetPhysicalEpoch()) std::this_thread::yield();
 //                LOG(INFO) << "**** Start Epoch Merge Epoch : " << epoch << "****\n";
-        while(!CRDTCounters::CheckEpochReadValidateComplete(epoch)) usleep(logical_sleep_timme);
+//        std::cerr << "CheckEpochExecComplete " << epoch << std::endl;
+        while(!CRDTCounters::CheckEpochExecComplete(epoch)) std::this_thread::yield();
+//        std::cerr << "CheckEpochReadValidateComplete " << epoch << std::endl;
+        while(!CRDTCounters::CheckEpochReadValidateComplete(epoch)) std::this_thread::yield();
 
-        while(!CRDTCounters::CheckEpochMergeComplete(epoch)) usleep(logical_sleep_timme);
+        while(!CRDTCounters::CheckEpochMergeComplete(epoch)) std::this_thread::yield();
+//        std::cerr << "SetEpochMergeComplete " << epoch << std::endl;
         EpochManager::SetEpochMergeComplete(epoch, true);
         merge_epoch.fetch_add(1);
         auto time5 = now_to_us();
+//        std::cerr << "**** Finished Epoch Merge Epoch : " << epoch << ",time cost : " << time5 - time1 << "****" << std::endl;
 //        LOG(INFO) << "**** Finished Epoch Merge Epoch : " << epoch << ",time cost : " << time5 - time1 << "****\n";
         abort_set_epoch.fetch_add(1);
         auto time6 = now_to_us();
 //        LOG(INFO) << "******* Finished Abort Set Merge Epoch : " << epoch << ",time cost : " << time6 - time5 << "********\n";
-        while(!CRDTCounters::CheckEpochCommitComplete(epoch)) usleep(logical_sleep_timme);
+        while(!CRDTCounters::CheckEpochCommitComplete(epoch)) std::this_thread::yield();
+//        std::cerr << "SetCommitComplete " << epoch << std::endl;
         EpochManager::SetCommitComplete(epoch, true);
         commit_epoch.fetch_add(1);
+
+        while(!CRDTCounters::CheckEpochRecordCommitted(epoch)) std::this_thread::yield();
+//        std::cerr << "SetRecordCommitted " << epoch << std::endl;
+        EpochManager::SetRecordCommitted(epoch, true);
+
+        while(!CRDTCounters::CheckEpochResultReturned(epoch)) std::this_thread::yield();
+//        std::cerr << "SetResultReturned " << epoch << std::endl;
+        EpochManager::SetResultReturned(epoch, true);
+
         EpochManager::AddLogicalEpoch();
         auto time7 = now_to_us();
         auto epoch_commit_success_txn_num =
@@ -185,8 +222,12 @@ void EpochLogicalTimerManagerThreadMain() {
         if(epoch % CRDTContext::print_mode_size == 0) {
             OUTPUTLOG("===== Logical Start Epoch的合并 ===== ", epoch);
         }
+        Merge::EpochClear(epoch);
+        CRDTCounters::StaticClear(epoch);
         epoch ++;
     }
+
+    OUTPUTLOG("===== Logical End Epoch的合并 ===== ", epoch);
 }
 
 

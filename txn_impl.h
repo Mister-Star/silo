@@ -238,6 +238,7 @@ template <template <typename> class Protocol, typename Traits>
 bool
 transaction<Protocol, Traits>::commit(bool doThrow)
 {
+    std::cerr << "txn_impl.h transaction<Protocol, Traits>::commit(bool doThrow)" << std::endl;
 #ifdef TUPLE_MAGIC
   try {
 #endif
@@ -516,6 +517,13 @@ transaction<Protocol, Traits>::try_insert_new_tuple(
 
   // perf: ~900 tsc/alloc on istc11.csail.mit.edu
   dbtuple * const tuple = dbtuple::alloc_first(sz, true);
+
+  //addby
+    varkey vk((const uint8_t *) key->data(), key->size());
+    uint64_t restored = vk.slice();  // restored == original
+  tuple->keyNum = restored;
+  tuple->index_key = *key;
+
   if (value)
     writer(dbtuple::TUPLE_WRITER_DO_WRITE,
         value, tuple->get_value_start(), 0);

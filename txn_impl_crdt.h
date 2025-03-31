@@ -23,137 +23,96 @@ transaction<Protocol, Traits>::transaction(uint64_t flags, string_allocator_type
 //    DISKAdaptor::nnew_txn.fetch_add(1);
 }
 
-//template<template<typename> class Protocol, typename Traits>
-//transaction<Protocol, Traits>::~transaction() {
-//    // transaction shouldn't fall out of scope w/o resolution
-//    // resolution means TXN_EMBRYO, TXN_COMMITED, and TXN_ABRT
-//    util::timer t;
-//    uint64_t duration;
-//    INVARIANT(state != TXN_ACTIVE);
-//    INVARIANT(rcu::s_instance.in_rcu_region());
-//    const unsigned cur_depth = rcu_guard_->sync()->depth();
-//    rcu_guard_.destroy();
-////    if (cur_depth == 1) {
-////        INVARIANT(!rcu::s_instance.in_rcu_region());
-////        cast()->on_post_rcu_region_completion();
-////    }
-//    if (node) {
-//        CoreIdArena::recollect(node);
-//        ::free(txn_buf);
-//    }
-//    duration = t.lap();
-////    DISKAdaptor::recollect_time.fetch_add(duration);
-//
-//#ifdef BTREE_LOCK_OWNERSHIP_CHECKING
-//    concurrent_btree::AssertAllNodeLocksReleased();
-//#endif
-//}
-
 template<template<typename> class Protocol, typename Traits>
-void
-transaction<Protocol, Traits>::crdt_shard(void *txn) {
-//    if (DISKAdaptor::initial_info){
-//        if (DISKAdaptor::water_level.load() == -1) {
-//            DISKAdaptor::water_level =
-//                    ((sen - 1) % CRDTContext::kCacheMaxLength + CRDTContext::kCacheMaxLength) % CRDTContext::kCacheMaxLength;
-//        }
-//        DISKAdaptor::vec_info[sen % CRDTContext::kCacheMaxLength].txn_num.fetch_add(1);
-//    }
-//
-//    cen = sen;
-//    util::timer t;
-//    split_write_dbtuples.resize(DISKAdaptor::GetNumShard());
-//    const uint64_t MAX_KEY = DISKAdaptor::Get_nkeys();
-//    uint64_t range_per_queue = MAX_KEY / DISKAdaptor::GetNumShard();
-//
-//    if (!write_set.empty()) {
-//        typename write_set_map::iterator it = write_set.begin();
-//        typename write_set_map::iterator it_end = write_set.end();
-//        for (size_t pos = 0; it != it_end; ++it, ++pos) {
-//            write_dbtuples.emplace_back(it->get_tuple(), &(*it), it->is_insert(), pos);
-//        }
-//    }
-//
-//    if (!write_dbtuples.empty()) {
-//        int queue_idx;
-//        {
-//            write_dbtuples.sort(); // in-place
-//        }
-//        typename dbtuple_write_info_vec::iterator it = write_dbtuples.begin();
-//        typename dbtuple_write_info_vec::iterator it_end = write_dbtuples.end();
-//        dbtuple_write_info *last_px = nullptr;
-//        for (; it != it_end; last_px = &(*it), ++it) {
-//            if (likely(last_px && last_px->tuple != it->tuple)) {
-//                dbtuple *const tuple = it->get_tuple();
-//                queue_idx = tuple->keyNum / range_per_queue;
-//                queue_idx = std::min(queue_idx, DISKAdaptor::GetNumShard() - 1);
-//                split_write_dbtuples[queue_idx].emplace_back(tuple);
-//            }
-//        }
-//        dbtuple *const tuple = last_px->get_tuple();
-//        queue_idx = tuple->keyNum / range_per_queue;
-//        queue_idx = std::min(queue_idx, DISKAdaptor::GetNumShard() - 1);
-//        split_write_dbtuples[queue_idx].emplace_back(tuple);
-//
-//        for (int i = 0; i < DISKAdaptor::GetNumShard(); i++) {
-//            if (!split_write_dbtuples[i].empty()) {
-//                count.fetch_add(1);
-//            }
-//        }
-//        for (int i = 0; i < DISKAdaptor::GetNumShard(); i++) {
-//            if (!split_write_dbtuples[i].empty()) {
-//                DISKAdaptor::txn_shard_merge_queues[cen % CRDTContext::kCacheMaxLength][i].enqueue(txn);
-//            }
-//        }
-//    } else {
-//        DISKAdaptor::IncLocalMergeCounters(cen);
-//        DISKAdaptor::txn_commit_queues[cen % CRDTContext::kCacheMaxLength].enqueue(txn);
-//    }
-//    DISKAdaptor::shard_done += t.lap();
-    return;
-}
+bool
+transaction<Protocol, Traits>::crdt_commit(void* txn, int shard_id, void* crdt_txn) {
+    /// called by bench_worker
+    std::cerr << "crdt_commit commit a txn to merge"<< std::endl;
+    coreid::set_core_id_without_check(coreId);
 
-template<template<typename> class Protocol, typename Traits>
-void
-transaction<Protocol, Traits>::crdt_merge(void *txn, int id) {
-//    csn = (util::timer::cur_usec() << 16) |
-//                           (DISKAdaptor::counter.fetch_add(1, std::memory_order_relaxed) & 0xFFFF);
-//    util::timer t;
-//    if (DISKAdaptor::clear_map) {
-//        while (DISKAdaptor::clear_map) {
-//            sched_yield();
-//        }
-//        DISKAdaptor::wait_clear_map.fetch_add(t.lap());
-//    }
-//    DISKAdaptor::critical_section_cnt.fetch_add(1);
-//    for (typename dbtuple_write_info_vec::iterator it = split_write_dbtuples[id].begin();
-//         it != split_write_dbtuples[id].end(); ++it) {
-//        dbtuple *tuple = it->get_tuple();
-//        std::pair<uint64_t, uint64_t> value;
-//        DISKAdaptor::tuple_map.getValue(tuple, value);
-//        if (cen > value.first) {
-//            DISKAdaptor::tuple_map.insert(tuple, std::make_pair(cen, csn));
-//        } else if (cen == value.first) {
-//            if (value.second < csn) {
-//                DISKAdaptor::abort_transcation_csn_set.insert(csn, csn);
-//            } else if (value.second > csn) {
-//                DISKAdaptor::abort_transcation_csn_set.insert(value.second, value.second);
-//                DISKAdaptor::tuple_map.insert(tuple, std::make_pair(cen, csn));
-//            }
-//        } else DISKAdaptor::abort_transcation_csn_set.insert(value.second, value.second);
-//    }
-//    DISKAdaptor::critical_section_cnt.fetch_sub(1);
-//    if (count.fetch_sub(1) == 1) {
-//        DISKAdaptor::IncLocalMergeCounters(cen);
-//        DISKAdaptor::txn_commit_queues[cen % CRDTContext::kCacheMaxLength].enqueue(txn);
-//    }
+    auto* temp_crdt_txn_ptr = static_cast<std::shared_ptr<CRDTTransaction>*>(crdt_txn);
+    auto crdt_txn_ptr = *temp_crdt_txn_ptr;
+    ///sharding
+    std::vector<std::shared_ptr<CRDTTransaction>> sharded_read_txn, sharded_write_txn;
+    sharded_read_txn.reserve(CRDTContext::kShardNum);
+    sharded_write_txn.reserve(CRDTContext::kShardNum);
+    for(uint64_t i = 0; i < CRDTContext::kShardNum; i ++) {
+        sharded_read_txn.emplace_back(std::make_shared<CRDTTransaction>());
+
+        sharded_read_txn[i]->sen = crdt_txn_ptr->sen;
+        sharded_read_txn[i]->tid = crdt_txn_ptr->tid;
+        sharded_read_txn[i]->txn = crdt_txn_ptr->txn;
+
+        sharded_write_txn.emplace_back(std::make_shared<CRDTTransaction>());
+
+        sharded_write_txn[i]->sen = crdt_txn_ptr->sen;
+        sharded_write_txn[i]->tid = crdt_txn_ptr->tid;
+        sharded_write_txn[i]->txn = crdt_txn_ptr->txn;
+    }
+
+    const uint64_t MAX_KEY = CRDTContext::kNKeys;
+    uint64_t range_per_queue = MAX_KEY / CRDTContext::kShardNum;
+
+    for(auto &it : read_set) {
+        ///sharded_read_txn
+        auto tuple = it.get_tuple();
+        auto shard = (tuple->keyNum / range_per_queue) % CRDTContext::kShardNum;
+        sharded_read_txn[shard]->read_set.emplace(
+                std::make_pair(tuple->index_key,
+                               std::move(CRDTRow(tuple->stable_csn, OpType::Read))));
+    }
+
+    for(auto it : write_set) {
+        ///sharded_write_txn
+        auto tuple = it.get_tuple();
+        auto shard = (tuple->keyNum / range_per_queue) % CRDTContext::kShardNum;
+        //todo: op_type
+        // if(tuple->op_type == update)
+        sharded_read_txn[shard]->read_set.emplace(
+                std::make_pair(tuple->index_key,
+                               std::move(CRDTRow(tuple->stable_csn, OpType::Update,
+                                                 tuple->index_key,
+                                                 std::string(reinterpret_cast<const char*>(tuple->value_start)
+                                                             , tuple->size)))));
+    }
+
+    auto cen = EpochManager::GetPhysicalEpoch();
+    CRDTCounters::IncEpochShouldExecTxnNum(cen, 1);
+    crdt_txn_ptr->cen = cen;
+    crdt_txn_ptr->csn = now_to_us();
+
+    for(uint64_t i = 0; i < CRDTContext::kShardNum; i ++) {
+        sharded_read_txn[i]->cen = crdt_txn_ptr->cen;
+        sharded_read_txn[i]->csn = crdt_txn_ptr->csn;
+
+        sharded_write_txn[i]->cen = crdt_txn_ptr->cen;
+        sharded_write_txn[i]->csn = crdt_txn_ptr->csn;
+    }
+
+    //Enqueue
+    for(uint64_t i = 0; i < CRDTContext::kShardNum; i ++) {
+        std::cerr << "crdt_commit enqueue sharded_txn"<< std::endl;
+        Merge::ReadValidateQueueEnqueue(i, cen, CRDTContext::kCacheMaxLength, sharded_read_txn[i]);
+        Merge::MergeQueueEnqueue(i, cen, CRDTContext::kCacheMaxLength, sharded_write_txn[i]);
+        Merge::CommitQueueEnqueue(i, cen, CRDTContext::kCacheMaxLength, sharded_write_txn[i]);
+    }
+    Merge::ResultReturnQueueEnqueue(shard_id, cen, CRDTContext::kCacheMaxLength, crdt_txn_ptr);
+    CRDTCounters::IncEpochExecTxnNum(cen, 1);
+    /// wait for epoch_result_returned_queue_vec[shard] to dequeue the result;
+
+    delete temp_crdt_txn_ptr;
+
+    return true;
 }
 
 template<template<typename> class Protocol, typename Traits>
 bool
-transaction<Protocol, Traits>::crdt_commit() {
-    coreid::set_core_id_without_check(coreId);
-//    util::timer t;
+transaction<Protocol, Traits>::crdt_record_commit(void* txn, int shard_id, void* crdt_txn) {
+    ///writing record
+    /// called by merge thread or bench_worker.
+    ///todo: update the record
+
+    //    util::timer t;
 //    uint64_t duration;
 //    std::pair<bool, tid_t> commit_tid{false, 0};
 //    duration = wait_commit_t.lap();
@@ -309,9 +268,7 @@ transaction<Protocol, Traits>::crdt_commit() {
 //    state = TXN_ABRT;
 //    clear();
 //    DISKAdaptor::IncLocalApplyCounters(cen);
-    return false;
+    return true;
 }
-
-
 
 #endif /* _NDB_TXN_IMPL_CRDT_H_ */

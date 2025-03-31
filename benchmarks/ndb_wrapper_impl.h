@@ -30,6 +30,17 @@ struct hint_kv_get_put_traits {
   typedef str_arena StringAllocator;
 };
 
+///addby
+struct hint_kv_txn_traits {
+    static const size_t read_set_expected_size = 10;
+    static const size_t write_set_expected_size = 10;
+    static const size_t absent_set_expected_size = 10;
+    static const bool stable_input_memory = true;
+    static const bool hard_expected_sizes = true;
+    static const bool read_own_writes = false;
+    typedef str_arena StringAllocator;
+};
+
 struct hint_kv_rmw_traits : public hint_kv_get_put_traits {};
 
 struct hint_kv_scan_traits {
@@ -111,6 +122,7 @@ struct hint_tpcc_stock_level_read_only_traits : public hint_read_only_traits {};
 #define TXN_PROFILE_HINT_OP(x) \
   x(abstract_db::HINT_DEFAULT, hint_default_traits) \
   x(abstract_db::HINT_KV_GET_PUT, hint_kv_get_put_traits) \
+  x(abstract_db::HINT_KV_TXN, hint_kv_txn_traits) \
   x(abstract_db::HINT_KV_RMW, hint_kv_rmw_traits) \
   x(abstract_db::HINT_KV_SCAN, hint_kv_scan_traits) \
   x(abstract_db::HINT_TPCC_NEW_ORDER, hint_tpcc_new_order_traits) \

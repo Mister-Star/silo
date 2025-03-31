@@ -16,6 +16,9 @@
 #include "../scopedperf.hh"
 #include "../allocator.h"
 
+#include "../CRDT/epoch_manager.h"
+#include "../CRDT/crdt_transaction.h"
+
 #ifdef USE_JEMALLOC
 //cannot include this header b/c conflicts with malloc.h
 //#include <jemalloc/jemalloc.h>
@@ -120,6 +123,14 @@ bench_worker::run()
   txn_counts.resize(workload.size());
   barrier_a->count_down();
   barrier_b->wait_for();
+
+  std::string name = "BenchWorker" + std::to_string(worker_id);
+  pthread_setname_np(pthread_self(), name.substr(0, 15).c_str());
+
+  shard_id = worker_id % CRDTContext::kShardNum;
+  auto crdt_txn = std::make_shared<CRDTTransaction>();
+  while(! EpochManager::IsShardInitOK()) std::this_thread::yield();
+
   while (running && (run_mode != RUNMODE_OPS || ntxn_commits < ops_per_worker)) {
     double d = r.next_uniform();
     for (size_t i = 0; i < workload.size(); i++) {
@@ -128,42 +139,82 @@ bench_worker::run()
         timer t;
         const unsigned long old_seed = r.get_seed();
         const auto ret = workload[i].fn(this);
-        if (likely(ret.first)) {
-          ++ntxn_commits;
-          latency_numer_us += t.lap();
-          backoff_shifts >>= 1;
-        } else {
-          ++ntxn_aborts;
-          if (retry_aborted_transaction && running) {
-            if (backoff_aborted_transaction) {
-              if (backoff_shifts < 63)
-                backoff_shifts++;
-              uint64_t spins = 1UL << backoff_shifts;
-              spins *= 100; // XXX: tuned pretty arbitrarily
-              evt_avg_abort_spins.offer(spins);
-              while (spins) {
-                nop_pause();
-                spins--;
-              }
-            }
-            r.set_seed(old_seed);
-            goto retry;
-          }
-        }
-        size_delta += ret.second; // should be zero on abort
+//        if (likely(ret.first)) {
+//          ++ntxn_commits;
+//          latency_numer_us += t.lap();
+//          backoff_shifts >>= 1;
+//        } else {
+//          ++ntxn_aborts;
+//          if (retry_aborted_transaction && running) {
+//            if (backoff_aborted_transaction) {
+//              if (backoff_shifts < 63)
+//                backoff_shifts++;
+//              uint64_t spins = 1UL << backoff_shifts;
+//              spins *= 100; // XXX: tuned pretty arbitrarily
+//              evt_avg_abort_spins.offer(spins);
+//              while (spins) {
+//                nop_pause();
+//                spins--;
+//              }
+//            }
+//            r.set_seed(old_seed);
+//            goto retry;
+//          }
+//        }
+//        size_delta += ret.second; // should be zero on abort
         txn_counts[i]++; // txn_counts aren't used to compute throughput (is
                          // just an informative number to print to the console
                          // in verbose mode)
-        break;
+//        break;
       }
       d -= workload[i].frequency;
     }
+    if (Merge::epoch_result_returned_queue_vec[shard_id]->try_dequeue(crdt_txn)) {
+//        coreid::set_core_id_andnocheck(db->get_coreId(txn));
+        if(crdt_txn->result) {
+            ++ntxn_commits;
+          latency_numer_us += crdt_txn->t.lap();
+//          backoff_shifts >>= 1;
+        }
+        else {
+            ++ntxn_aborts;
+        }
+        db->destroy_txn(crdt_txn->txn, worker_id);
+//        crdt_txn->read_set;
+    }
   }
+
+    while (Merge::epoch_result_returned_queue_vec[shard_id]->try_dequeue(crdt_txn)) {
+//        coreid::set_core_id_andnocheck(db->get_coreId(txn));
+        if(crdt_txn->result) {
+            ++ntxn_commits;
+            latency_numer_us += crdt_txn->t.lap();
+//          backoff_shifts >>= 1;
+        }
+        else {
+            ++ntxn_aborts;
+        }
+        db->destroy_txn(crdt_txn->txn, worker_id);
+//        crdt_txn->read_set;
+    }
 }
 
 void
 bench_runner::run()
 {
+    std::cerr << "bench_runner GetCRDTConfig" << std::endl;
+    CRDTContext::GetCRDTConfig();
+    CRDTContext::kNKeys = size_t(scale_factor * 1000.0);
+
+    std::vector<std::shared_ptr<std::thread>> merge_threads;
+    merge_threads.emplace_back(std::make_shared<std::thread>(EpochPhysicalTimerManagerThreadMain));
+    merge_threads.emplace_back(std::make_shared<std::thread>(EpochLogicalTimerManagerThreadMain));
+    for(int i = 0; i < CRDTContext::kMergeThreadNum; i ++) {
+        merge_threads.emplace_back(std::make_shared<std::thread>(MergeThreadMain, i));
+    }
+
+    while(!EpochManager::IsShardInitOK()) std::this_thread::yield();
+    std::cerr << "========YCSB start Loading Data ============" << std::endl;
   // load data
   const vector<bench_loader *> loaders = make_loaders();
   {
@@ -223,6 +274,8 @@ bench_runner::run()
     }
     cerr << "starting benchmark..." << endl;
   }
+
+    std::cerr << "========YCSB start benchmark ============" << std::endl;
 
   const pair<uint64_t, uint64_t> mem_info_before = get_system_memory_info();
 
@@ -370,6 +423,8 @@ bench_runner::run()
        << agg_abort_rate << endl;
   cout.flush();
 
+  ///todo : print EpochManager-commit info
+
   if (!slow_exit)
     return;
 
@@ -382,12 +437,19 @@ bench_runner::run()
   if (verbose) {
     for (auto &p : agg_stats)
       cerr << p.first << " : " << p.second << endl;
-
   }
   open_tables.clear();
 
+    std::cerr << "EpochManager SetTimerStop" << endl;
+    EpochManager::SetTimerStop(true);
+    for(auto i : merge_threads) {
+        i->join();
+    }
+
   delete_pointers(loaders);
   delete_pointers(workers);
+
+
 }
 
 template <typename K, typename V>
