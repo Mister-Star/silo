@@ -7,7 +7,7 @@
 
 
 std::atomic<uint64_t> CRDTCounters::inc_id(0);
-uint64_t CRDTCounters::max_length = 1;
+uint64_t CRDTCounters::max_length = 1, CRDTCounters::shard_num = 1;
 
 std::vector<std::shared_ptr<AtomicCounters>> ///[shard][epoch]
         CRDTCounters::epoch_should_read_validate_txn_num_vec,
@@ -31,8 +31,8 @@ std::vector<std::shared_ptr<AtomicCounters>> ///[shard][epoch]
         CRDTCounters::total_failed_txn_num_vec;
 
 AtomicCounters///[[epoch]
-    CRDTCounters::epoch_should_exec_txn_num(10),
-    CRDTCounters::epoch_exec_txn_num(10);
+    CRDTCounters::epoch_should_exec_txn_num(500),
+    CRDTCounters::epoch_exec_txn_num(500);
 
 std::vector<std::shared_ptr<std::atomic<bool>>> ///[epoch]
         CRDTCounters::epoch_read_validate_complete,
@@ -45,8 +45,11 @@ std::vector<std::shared_ptr<std::atomic<uint64_t>>> CRDTCounters::shard_init_fla
 
 bool CRDTCounters::StaticInit() {
 
-    auto max_length = CRDTContext::kCacheMaxLength;
-    auto shard_num = CRDTContext::kShardNum;
+    max_length = CRDTContext::kCacheMaxLength;
+    shard_num = CRDTContext::kShardNum;
+
+    std::cerr << "CRDTCounters::StaticInit" << " max_length " << max_length <<
+    " shard_num " << shard_num << std::endl;
 
     epoch_should_read_validate_txn_num_vec.resize(shard_num); ///[shard][epoch]
     epoch_read_validated_txn_num_vec.resize(shard_num);
@@ -119,6 +122,25 @@ bool CRDTCounters::StaticInitShard(uint64_t& shard) {
     total_failed_txn_num_vec[shard] = std::make_shared<AtomicCounters>(max_length);
 
 
+//    epoch_should_read_validate_txn_num_vec[shard]->Resize(max_length);
+//    epoch_read_validated_txn_num_vec[shard]->Resize(max_length);
+//    epoch_should_merge_txn_num_vec[shard]->Resize(max_length);
+//    epoch_merged_txn_num_vec[shard]->Resize(max_length);
+//    epoch_should_commit_txn_num_vec[shard]->Resize(max_length);
+//    epoch_committed_txn_num_vec[shard]->Resize(max_length);
+//    epoch_record_commit_txn_num_vec[shard]->Resize(max_length);
+//    epoch_record_committed_txn_num_vec[shard]->Resize(max_length);
+//    epoch_result_return_txn_num_vec[shard]->Resize(max_length);
+//    epoch_result_returned_txn_num_vec[shard]->Resize(max_length);
+//
+//    total_merge_txn_num_vec[shard]->Resize(max_length);
+//    total_merge_latency_vec[shard]->Resize(max_length);
+//    total_commit_txn_num_vec[shard]->Resize(max_length);
+//    total_commit_latency_vec[shard]->Resize(max_length);
+//    success_commit_txn_num_vec[shard]->Resize(max_length);
+//    success_commit_latency_vec[shard]->Resize(max_length);
+//    total_read_version_check_failed_txn_num_vec[shard]->Resize(max_length);
+//    total_failed_txn_num_vec[shard]->Resize(max_length);
     std::cerr << "CRDTCounters::StaticInitShard  end shard_id " << shard << std::endl;
     return true;
 }
@@ -260,8 +282,9 @@ void CRDTCounters::ClearAllThreadLocalCountNum(const uint64_t &epoch, const std:
 uint64_t CRDTCounters::GetAllThreadLocalCountNum(const uint64_t &epoch, const std::vector<std::shared_ptr<AtomicCounters>> &vec) {
     uint64_t ans = 0;
     for(const auto& i : vec) {
-        if(i != nullptr)
+        if(i != nullptr) {
             ans += i->GetCount(epoch);
+        }
     }
     return ans;
 }

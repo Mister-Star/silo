@@ -181,7 +181,7 @@ ndb_wrapper<Transaction>::new_txn(
     void *buf,
     TxnProfileHint hint)
 {
-    std::cerr << "ndb_wrapper_impl.h ndb_wrapper<Transaction>::new_txn" << std::endl;
+//    std::cerr << "ndb_wrapper_impl.h ndb_wrapper<Transaction>::new_txn" << std::endl;
   ndbtxn * const p = reinterpret_cast<ndbtxn *>(buf);
   p->hint = hint;
 #define MY_OP_X(a, b) \
@@ -210,7 +210,7 @@ template <template <typename> class Transaction>
 bool
 ndb_wrapper<Transaction>::commit_txn(void *txn)
 {
-    std::cerr << "ndb_wrapper_impl.h ndb_wrapper<Transaction>::commit_txn(void *txn)" << std::endl;
+//    std::cerr << "ndb_wrapper_impl.h ndb_wrapper<Transaction>::commit_txn(void *txn)" << std::endl;
   ndbtxn * const p = reinterpret_cast<ndbtxn *>(txn);
 #define MY_OP_X(a, b) \
   case a: \

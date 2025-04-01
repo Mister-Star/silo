@@ -14,7 +14,7 @@ class CRDTCounters {
 public:
     uint64_t thread_id = 0, shard_id = 0;
 
-    static uint64_t max_length;
+    static uint64_t max_length, shard_num;
     static std::atomic<uint64_t> inc_id;
 
     static bool StaticInit();
@@ -78,7 +78,7 @@ public:
     static uint64_t DecEpochShouldExecTxnNum(const uint64_t& epoch, uint64_t value) {
         return epoch_should_exec_txn_num.DecCount(epoch, value);
     }
-    static uint64_t GetEpochShouldExecTxnNum(const uint64_t& epoch, uint64_t value) {
+    static uint64_t GetEpochShouldExecTxnNum(const uint64_t& epoch) {
         return epoch_should_exec_txn_num.GetCount(epoch);
     }
 
@@ -88,7 +88,7 @@ public:
     static uint64_t DecEpochExecTxnNum(const uint64_t& epoch, uint64_t value) {
         return epoch_exec_txn_num.DecCount(epoch, value);
     }
-    static uint64_t GetEpochExecTxnNum(const uint64_t& epoch, uint64_t value) {
+    static uint64_t GetEpochExecTxnNum(const uint64_t& epoch) {
         return epoch_exec_txn_num.GetCount(epoch);
     }
 

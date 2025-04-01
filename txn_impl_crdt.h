@@ -27,8 +27,9 @@ template<template<typename> class Protocol, typename Traits>
 bool
 transaction<Protocol, Traits>::crdt_commit(void* txn, int shard_id, void* crdt_txn) {
     /// called by bench_worker
-    std::cerr << "crdt_commit commit a txn to merge"<< std::endl;
+//    std::cerr << "crdt_commit commit a txn to merge"<< std::endl;
     coreid::set_core_id_without_check(coreId);
+    state = TXN_COMMITED;
 
     auto* temp_crdt_txn_ptr = static_cast<std::shared_ptr<CRDTTransaction>*>(crdt_txn);
     auto crdt_txn_ptr = *temp_crdt_txn_ptr;
@@ -57,6 +58,7 @@ transaction<Protocol, Traits>::crdt_commit(void* txn, int shard_id, void* crdt_t
         ///sharded_read_txn
         auto tuple = it.get_tuple();
         auto shard = (tuple->keyNum / range_per_queue) % CRDTContext::kShardNum;
+        ///todo: 将sharded_read_txn 写到对应的内存，而非当前线程存在的NUMA内存
         sharded_read_txn[shard]->read_set.emplace(
                 std::make_pair(tuple->index_key,
                                std::move(CRDTRow(tuple->stable_csn, OpType::Read))));
@@ -68,6 +70,8 @@ transaction<Protocol, Traits>::crdt_commit(void* txn, int shard_id, void* crdt_t
         auto shard = (tuple->keyNum / range_per_queue) % CRDTContext::kShardNum;
         //todo: op_type
         // if(tuple->op_type == update)
+
+        ///todo: 将sharded_read_txn 写到对应的内存，而非当前线程存在的NUMA内存
         sharded_read_txn[shard]->read_set.emplace(
                 std::make_pair(tuple->index_key,
                                std::move(CRDTRow(tuple->stable_csn, OpType::Update,
@@ -90,8 +94,8 @@ transaction<Protocol, Traits>::crdt_commit(void* txn, int shard_id, void* crdt_t
     }
 
     //Enqueue
+//    std::cerr << "crdt_commit enqueue sharded_txn cen" << cen << std::endl;
     for(uint64_t i = 0; i < CRDTContext::kShardNum; i ++) {
-        std::cerr << "crdt_commit enqueue sharded_txn"<< std::endl;
         Merge::ReadValidateQueueEnqueue(i, cen, CRDTContext::kCacheMaxLength, sharded_read_txn[i]);
         Merge::MergeQueueEnqueue(i, cen, CRDTContext::kCacheMaxLength, sharded_write_txn[i]);
         Merge::CommitQueueEnqueue(i, cen, CRDTContext::kCacheMaxLength, sharded_write_txn[i]);

@@ -159,6 +159,7 @@ MASSTREE_SRCFILES = masstree/compiler.cc \
 endif
 
 OBJFILES := $(patsubst %.cc, $(O)/%.o, $(SRCFILES))
+#OBJFILES := $(patsubst %.cc, $(O)/%.o, $(filter %.cc, $(SRCFILES))) $(patsubst %.cpp, $(O)/%.o, $(filter %.cpp, $(SRCFILES)))
 
 MASSTREE_OBJFILES := $(patsubst masstree/%.cc, $(O)/%.o, $(MASSTREE_SRCFILES))
 

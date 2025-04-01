@@ -238,7 +238,7 @@ template <template <typename> class Protocol, typename Traits>
 bool
 transaction<Protocol, Traits>::commit(bool doThrow)
 {
-    std::cerr << "txn_impl.h transaction<Protocol, Traits>::commit(bool doThrow)" << std::endl;
+//    std::cerr << "txn_impl.h transaction<Protocol, Traits>::commit(bool doThrow)" << std::endl;
 #ifdef TUPLE_MAGIC
   try {
 #endif

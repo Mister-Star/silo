@@ -89,20 +89,23 @@ std::string PrintfToString(const char* format, ...) {
 
 void OUTPUTLOG(const std::string& s, uint64_t& epoch_){
     auto epoch_mod = epoch_ % EpochManager::max_length;
+    auto phy_e = EpochManager::GetPhysicalEpoch();
+    auto log_e = epoch_;
     cerr << PrintfToString("%60s \n\
         physical                     %6lu, logical                  %6lu,   \
-        pushdownepoch                %6lu  \n\
+        dist                %6lu  \n\
 \
-        ShouldReadValidateTxnNum     %6lu, ReadValidatedTxnNum      %6lu,   \
-        ShouldMergeTxnNum            %6lu, MergedTxnNum             %6lu, \n\
-        ShouldCommitTxnNum           %6lu, CommittedTxnNum          %6lu,   \
-        ShouldRecordCommitTxnNum     %6lu, RecordCommittedTxnNum    %6lu, \n\
-        ResultreturnTxnNum           %6lu, ResultreturnedTxnNum     %6lu,   \
+        ShouldExecTxnNum             %6lu, ExecedTxnNum             %6lu,   \
+        ShouldReadValidateTxnNum     %6lu, ReadValidatedTxnNum      %6lu, \n\
+        ShouldMergeTxnNum            %6lu, MergedTxnNum             %6lu,   \
+        ShouldCommitTxnNum           %6lu, CommittedTxnNum          %6lu, \n\
+        ShouldRecordCommitTxnNum     %6lu, RecordCommittedTxnNum    %6lu,   \
+        ResultreturnTxnNum           %6lu, ResultreturnedTxnNum     %6lu, \n\
         merge_num                    %6lu, time          %lu \n",
        s.c_str(),
-       EpochManager::GetPhysicalEpoch(),  EpochManager::GetLogicalEpoch(),
-       EpochManager::GetPushDownEpoch(),
+       phy_e, epoch_, phy_e - epoch_,
 
+       CRDTCounters::GetEpochShouldExecTxnNum(epoch_mod), CRDTCounters::GetEpochExecTxnNum(epoch_mod),
        CRDTCounters::GetAllThreadLocalCountNum(epoch_mod, CRDTCounters::epoch_should_read_validate_txn_num_vec),
        CRDTCounters::GetAllThreadLocalCountNum(epoch_mod, CRDTCounters::epoch_read_validated_txn_num_vec),
        CRDTCounters::GetAllThreadLocalCountNum(epoch_mod, CRDTCounters::epoch_should_merge_txn_num_vec),
@@ -137,9 +140,10 @@ void EpochPhysicalTimerManagerThreadMain() {
     printf("=============  EpochManager Init 完成，数据库开始正常运行 ============= \n");
 
     while(!EpochManager::IsTimerStop()){
-        auto sleep_time_ = GetSleeptime();
-        std::cerr << "physical sleep_time " << sleep_time_ << std::endl;
-        usleep(sleep_time_);
+//        auto sleep_time_ = GetSleeptime();
+//        std::cerr << "physical sleep_time " << sleep_time_ << std::endl;
+//        usleep(sleep_time_);
+        usleep(GetSleeptime());
         EpochManager::AddPhysicalEpoch();
         epoch_ ++;
         logical = EpochManager::GetLogicalEpoch();
@@ -156,16 +160,16 @@ void EpochPhysicalTimerManagerThreadMain() {
 void MergeThreadMain(uint64_t thread_id) {
     std::string name = "EpochMerge" + std::to_string(thread_id);
     pthread_setname_np(pthread_self(), name.substr(0, 15).c_str());
-    std::cerr << "MergeThreadMain  " << thread_id << std::endl;
+//    std::cerr << "MergeThreadMain  " << thread_id << std::endl;
     while(init_ok_num.load() < 1) std::this_thread::yield();
     auto shard_id = thread_id % CRDTContext::kShardNum;
-    std::cerr << "thread start shardStatic init  " << thread_id  << " shard_id " << shard_id<< std::endl;
+//    std::cerr << "thread start shardStatic init  " << thread_id  << " shard_id " << shard_id<< std::endl;
     Merge::ShardInit(shard_id);
     CRDTCounters::StaticInitShard(shard_id);
-    std::cerr << "thread shardStatic init  finished" << thread_id << " shard_id " << shard_id<< std::endl;
+//    std::cerr << "thread shardStatic init  finished" << thread_id << " shard_id " << shard_id<< std::endl;
     init_ok_num.fetch_add(1);
     while(!EpochManager::IsShardInitOK()) std::this_thread::yield();
-    std::cerr << "thread MergeThreadLocalInit  " << thread_id << std::endl;
+//    std::cerr << "thread MergeThreadLocalInit  " << thread_id << std::endl;
     Merge merge;
     merge.MergeThreadLocalInit(shard_id);
     std::cerr << "EpochMerge  " << thread_id << std::endl;
@@ -181,24 +185,38 @@ void EpochLogicalTimerManagerThreadMain() {
     OUTPUTLOG("===== Logical Start Epoch的合并 ===== ", epoch);
     while(!EpochManager::IsShardInitOK()) usleep(logical_sleep_timme);
     while(!EpochManager::IsTimerStop()){
-        auto time1 = now_to_us();
+//        auto time1 = now_to_us();
 //        std::cerr << "epoch >= EpochManager::GetPhysicalEpoch() " << epoch << std::endl;
         while(epoch >= EpochManager::GetPhysicalEpoch()) std::this_thread::yield();
 //                LOG(INFO) << "**** Start Epoch Merge Epoch : " << epoch << "****\n";
 //        std::cerr << "CheckEpochExecComplete " << epoch << std::endl;
-        while(!CRDTCounters::CheckEpochExecComplete(epoch)) std::this_thread::yield();
+        while(!CRDTCounters::CheckEpochExecComplete(epoch)) {
+//            std::cerr << "EpochManager epoch" << epoch << " CheckEpochExecComplete exec tnx count: " <<
+//                      CRDTCounters::epoch_should_exec_txn_num.GetCount(epoch)
+//                      << "execed txn counters "<<  CRDTCounters::epoch_exec_txn_num.GetCount(epoch)
+//                      << std::endl;
+            std::this_thread::yield();
+        }
 //        std::cerr << "CheckEpochReadValidateComplete " << epoch << std::endl;
-        while(!CRDTCounters::CheckEpochReadValidateComplete(epoch)) std::this_thread::yield();
+        while(!CRDTCounters::CheckEpochReadValidateComplete(epoch)) {
+//            std::cerr << "EpochManager epoch" << epoch << " CheckEpochReadValidateComplete should read validate count: " <<
+//            CRDTCounters::GetAllThreadLocalCountNum(epoch, 0, CRDTCounters::epoch_should_read_validate_txn_num_vec)
+//            << "Read validated txn counters "<<  CRDTCounters::GetAllThreadLocalCountNum(epoch, 0, CRDTCounters::epoch_read_validated_txn_num_vec)
+//            << std::endl;
+            std::this_thread::yield();
+        }
+//        std::cerr << "EpochReadValidateComplete " << epoch << std::endl;
 
         while(!CRDTCounters::CheckEpochMergeComplete(epoch)) std::this_thread::yield();
 //        std::cerr << "SetEpochMergeComplete " << epoch << std::endl;
         EpochManager::SetEpochMergeComplete(epoch, true);
         merge_epoch.fetch_add(1);
-        auto time5 = now_to_us();
+        EpochManager::SetAbortSetMergeComplete(epoch, true);
+//        auto time5 = now_to_us();
 //        std::cerr << "**** Finished Epoch Merge Epoch : " << epoch << ",time cost : " << time5 - time1 << "****" << std::endl;
 //        LOG(INFO) << "**** Finished Epoch Merge Epoch : " << epoch << ",time cost : " << time5 - time1 << "****\n";
         abort_set_epoch.fetch_add(1);
-        auto time6 = now_to_us();
+//        auto time6 = now_to_us();
 //        LOG(INFO) << "******* Finished Abort Set Merge Epoch : " << epoch << ",time cost : " << time6 - time5 << "********\n";
         while(!CRDTCounters::CheckEpochCommitComplete(epoch)) std::this_thread::yield();
 //        std::cerr << "SetCommitComplete " << epoch << std::endl;
@@ -214,7 +232,7 @@ void EpochLogicalTimerManagerThreadMain() {
         EpochManager::SetResultReturned(epoch, true);
 
         EpochManager::AddLogicalEpoch();
-        auto time7 = now_to_us();
+//        auto time7 = now_to_us();
         auto epoch_commit_success_txn_num =
               CRDTCounters::GetAllThreadLocalCountNum(epoch, CRDTCounters::epoch_record_committed_txn_num_vec);
         total_commit_txn_num += epoch_commit_success_txn_num;///success
@@ -224,6 +242,10 @@ void EpochLogicalTimerManagerThreadMain() {
         }
         Merge::EpochClear(epoch);
         CRDTCounters::StaticClear(epoch);
+        EpochManager::ClearMergeEpochState(epoch);
+//        auto phy_e = EpochManager::GetPhysicalEpoch();
+//        auto dist = phy_e - epoch;
+//        if(dist > 1) std:: cerr << "logical epoch " << epoch << " dist " << dist << std::endl;
         epoch ++;
     }
 

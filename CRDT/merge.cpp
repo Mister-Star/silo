@@ -46,6 +46,9 @@ void Merge::Init() { /// [shard][epoch]
     auto max_length = CRDTContext::kCacheMaxLength;
     auto shard =  CRDTContext::kShardNum;
 
+    std::cerr << "Merge::Init" << " max_length " << max_length <<
+              " shard_num " << shard << std::endl;
+
     epoch_merge_map_vec.resize(shard);
     epoch_abort_map_vec.resize(shard);
 
@@ -77,11 +80,13 @@ void Merge::Init() { /// [shard][epoch]
 }
 
 void Merge::ShardInit(const uint64_t &shard) { /// [shard][epoch]
+
     if(shard_init_flag[shard]->fetch_add(1) != 0)
         return ;
     auto max_length = CRDTContext::kCacheMaxLength;
 
-    std::cerr << "Merge::ShardInit  shard_id " << shard << std::endl;
+    std::cerr << "Merge::ShardInit" << " max_length " << max_length <<
+              " shard_id " << shard << std::endl;
 
     epoch_merge_map_vec[shard] = std::make_shared<std::vector<std::shared_ptr<
             concurrent_crdt_unordered_map<std::string, std::string, std::string>>>>();
@@ -162,9 +167,11 @@ void Merge::EpochClear(uint64_t &epoch) {
 
 void Merge::MergeThreadLocalInit(const uint64_t &shard) {
 
-    std::cerr <<"Merge::MergeThreadLocalInit shard_id " << shard << std::endl;
     shard_id = shard;
     max_length = CRDTContext::kCacheMaxLength;
+
+    std::cerr << "Merge::MergeThreadLocalInit" << " max_length " << max_length <<
+              " shard_id " << shard << std::endl;
 
     epoch_should_read_validate_txn_num_shard = CRDTCounters::epoch_should_read_validate_txn_num_vec[shard];
     epoch_read_validated_txn_num_shard = CRDTCounters::epoch_read_validated_txn_num_vec[shard];
@@ -206,7 +213,7 @@ void Merge::MergeThreadLocalInit(const uint64_t &shard) {
 void Merge::ReadValidateQueueEnqueue(const uint64_t &shard_, const uint64_t &epoch_,
                                      const uint64_t &max_length_, const std::shared_ptr<CRDTTransaction> &txn_ptr_){
     auto epoch_mod_temp = epoch_ % max_length_;
-    std::cerr << "ReadValidateQueueEnqueue shard_id " << shard_ << " epoch " << epoch_ << " epoch_mod " << epoch_mod_temp << " enqueue a txn" << std::endl;
+//    std::cerr << "ReadValidateQueueEnqueue shard_id " << shard_ << " epoch " << epoch_ << " epoch_mod " << epoch_mod_temp << " enqueue a txn" << std::endl;
     CRDTCounters::epoch_should_read_validate_txn_num_vec[shard_]->IncCount(epoch_mod_temp, 1);
     (*epoch_read_validate_queue_vec[shard_])[epoch_mod_temp]->enqueue(txn_ptr_);
     (*epoch_read_validate_queue_vec[shard_])[epoch_mod_temp]->enqueue(nullptr);
@@ -214,7 +221,7 @@ void Merge::ReadValidateQueueEnqueue(const uint64_t &shard_, const uint64_t &epo
 void Merge::MergeQueueEnqueue(const uint64_t &shard_, const uint64_t &epoch_,
                               const uint64_t &max_length_, const std::shared_ptr<CRDTTransaction> &txn_ptr_){
     auto epoch_mod_temp = epoch_ % max_length_;
-    std::cerr << "MergeQueueEnqueue shard_id " << shard_ << " epoch " << epoch_ << " epoch_mod " << epoch_mod_temp << " enqueue a txn" << std::endl;
+//    std::cerr << "MergeQueueEnqueue shard_id " << shard_ << " epoch " << epoch_ << " epoch_mod " << epoch_mod_temp << " enqueue a txn" << std::endl;
     CRDTCounters::epoch_should_merge_txn_num_vec[shard_]->IncCount(epoch_mod_temp, 1);
     (*epoch_merge_queue_vec[shard_])[epoch_mod_temp]->enqueue(txn_ptr_);
     (*epoch_merge_queue_vec[shard_])[epoch_mod_temp]->enqueue(nullptr);
@@ -324,7 +331,7 @@ void Merge::EpochMerge() {
 
         while((*epoch_read_validate_queue_shard)[epoch_mod]->try_dequeue(txn_ptr)) { /// only local txn do this procedure
             if (txn_ptr != nullptr) {
-                std::cerr << "merge dequeue read_validate" << shard_id << " epoch " << epoch << std::endl;
+//                std::cerr << "merge dequeue read_validate" << shard_id << " epoch " << epoch << std::endl;
                 ValidateReadSet();
                 txn_ptr.reset();
                 sleep_flag = false;
@@ -334,9 +341,9 @@ void Merge::EpochMerge() {
         if(!EpochManager::IsEpochMergeComplete(epoch)) {
 //            std::cerr << "merge try_dequeue epoch_merge_queue_shard" << shard_id << " epoch " << epoch << std::endl;
             while ((*epoch_merge_queue_shard)[epoch_mod]->try_dequeue(txn_ptr)) {
-                std::cerr << "merge dequeue CRDTMerge" << shard_id << " epoch " << epoch << std::endl;
+//                std::cerr << "merge dequeue CRDTMerge" << shard_id << " epoch " << epoch << std::endl;
                 if (txn_ptr != nullptr) {
-                    std::cerr << "merge dequeue sharded_txn CRDTMerge"<< std::endl;
+//                    std::cerr << "merge dequeue sharded_txn CRDTMerge"<< shard_id << " epoch " << epoch << std::endl;
                     CRDTMerge();
                     txn_ptr.reset();
                     sleep_flag = false;
@@ -349,7 +356,7 @@ void Merge::EpochMerge() {
             while (!EpochManager::IsCommitComplete(epoch) &&
                     (*epoch_commit_queue_shard)[epoch_mod]->try_dequeue(txn_ptr)) {
                 if (txn_ptr != nullptr) {
-                    std::cerr << "merge dequeue sharded_txn Commit"<< std::endl;
+//                    std::cerr << "merge dequeue sharded_txn Commit"<< std::endl;
                     Commit();
                     txn_ptr.reset();
                     sleep_flag = false;
@@ -364,7 +371,7 @@ void Merge::EpochMerge() {
             while (!EpochManager::IsResultReturned(epoch) &&
                    (*epoch_result_return_queue_shard)[epoch_mod]->try_dequeue(txn_ptr)) {
                 if (txn_ptr != nullptr) {
-                    std::cerr << "merge dequeue txn ResultReturn"<< std::endl;
+//                    std::cerr << "merge dequeue txn ResultReturn"<< std::endl;
                     epoch_mod = txn_ptr->cen % max_length;
                     csn_temp = std::to_string(txn_ptr->csn);
                     csn_result = "";
@@ -382,7 +389,7 @@ void Merge::EpochMerge() {
         }
 
         if(sleep_flag)
-            usleep(50);
-//            std::this_thread::yield();
+//            usleep(50);
+            std::this_thread::yield();
     }
 }

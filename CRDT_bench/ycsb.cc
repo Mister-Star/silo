@@ -177,7 +177,7 @@ public:
         crdt_txn->tid = now_to_us();
 
         try {
-            std::cerr << "ycsb_worker run a txn "<< std::endl;
+//            std::cerr << "ycsb_worker run a txn "<< std::endl;
             for(int i = 0; i < CRDTContext::YCSB_OPs; i ++) {
                 const uint64_t k = r.next() % nkeys;
                 if(k % 100 < CRDTContext::YCSB_Read) {
@@ -191,7 +191,7 @@ public:
             measure_txn_counters(txn, "txn");
             void* crdt_txn_void = static_cast<void*>(new std::shared_ptr<CRDTTransaction>(std::move(crdt_txn)));
             db->crdt_commit(txn, shard_id, crdt_txn_void);
-            usleep(1000000);
+//            usleep(50);
             return txn_result(true, 0);
         } catch (abstract_db::abstract_abort_exception &ex) {
             db->abort_txn(txn);
