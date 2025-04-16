@@ -52,6 +52,14 @@ public:
   typedef size_t size_type;
   typedef std::string string_type;
 
+    //addby
+    uint64_t sen = 0;
+    uint64_t cen = 0;
+    uint64_t csn = 0;
+    uint64_t stable_csn = 0;
+    uint64_t keyNum = -1;
+    std::string index_key;
+
   static const tid_t MIN_TID = 0;
   static const tid_t MAX_TID = (tid_t) -1;
 

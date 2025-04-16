@@ -72,6 +72,7 @@ public:
 
     // ycsb profiles
     HINT_KV_GET_PUT, // KV workloads over a single key
+    HINT_KV_TXN, //addby KV workload do multi_ple rows
     HINT_KV_RMW, // get/put over a single key
     HINT_KV_SCAN, // KV scan workloads (~100 keys)
 
@@ -117,6 +118,14 @@ public:
    * return false- caller should be prepared to deal with both cases
    */
   virtual bool commit_txn(void *txn) = 0;
+
+  ///addby
+    virtual int get_workerId(void *txn , int id) = 0;
+    virtual int get_coreId(void *txn , int id) = 0;
+    virtual bool crdt_commit(void *txn, int id, void *crdt_txn) = 0;
+    virtual bool crdt_record_commit(void *txn, int id, void *crdt_txn) = 0;
+    virtual void destroy_txn(void *txn, int id) = 0;
+    virtual void register_g_threadctxs() = 0;
 
   /**
    * XXX

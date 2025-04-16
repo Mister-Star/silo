@@ -56,6 +56,16 @@ public:
     tl_core_id = cid; // sigh
   }
 
+    //addby
+    static void
+    set_core_id_without_check(unsigned cid) {
+        ALWAYS_ASSERT(cid < NMaxCores);
+//        if (g_core_count.load(std::memory_order_acquire) <= cid) {
+//            g_core_count.store(cid + 1, std::memory_order_release);
+//        }
+        tl_core_id = cid;
+    }
+
   // actual number of CPUs online for the system
   static unsigned num_cpus_online();
 

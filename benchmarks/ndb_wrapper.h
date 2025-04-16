@@ -93,6 +93,16 @@ public:
       void *buf,
       TxnProfileHint hint);
   virtual bool commit_txn(void *txn);
+
+    ///addby
+    virtual int get_workerId(void *txn, int id);
+    virtual int get_coreId(void *txn, int id);
+    virtual bool crdt_commit(void *txn, int shard_id, void *crdt_txn);
+    virtual bool crdt_record_commit(void *txn, int shard_id, void *crdt_txn);
+    virtual void destroy_txn(void *txn, int id);
+    virtual void register_g_threadctxs();
+
+
   virtual void abort_txn(void *txn);
   virtual void print_txn_debug(void *txn) const;
   virtual std::map<std::string, uint64_t> get_txn_counters(void *txn) const;

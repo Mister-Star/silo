@@ -19,6 +19,11 @@
 
 #include "bench.h"
 
+#include "../CRDT/crdt_context.h"
+#include "../CRDT/epoch_manager.h"
+#include "../CRDT/crdt_transaction.h"
+#include "../CRDT/merge.h"
+
 using namespace std;
 using namespace util;
 
@@ -156,6 +161,64 @@ public:
     return static_cast<ycsb_worker *>(w)->txn_scan();
   }
 
+
+    txn_result
+    do_txn()
+    {
+//        void * const txn = db->new_txn(txn_flags, arena, txn_buf(), abstract_db::HINT_KV_GET_PUT);
+
+
+        void * const txn = db->new_txn(txn_flags, arena, txn_buf(), abstract_db::HINT_KV_TXN);
+//        void *buf = malloc(db->sizeof_txn_object(txn_flags));
+//        void *const txn = db->new_txn(txn_flags, arena, buf, abstract_db::HINT_KV_TXN);
+        scoped_str_arena s_arena(arena);
+
+//        auto crdt_txn_index = crdt_txn_buffer.get_next_recycle();
+//
+//        auto sharded_txn_vec = crdt_txn_buffer.GetVec(crdt_txn_index);
+
+//        txn->sharded_txn_vec = sharded_txn_vec;
+
+
+        auto crdt_txn_index = 10;
+        auto crdt_txn = std::make_shared<CRDTTransaction>();
+        crdt_txn->txn = txn;
+        crdt_txn->sen = EpochManager::GetLogicalEpoch();
+        crdt_txn->tid = now_to_us();
+        crdt_txn->crdt_worker_id = crdt_worker_id;
+        crdt_txn->crdt_txn_id = crdt_txn_index;
+        crdt_txn->row_size = 10; ///for YCSB txn, TPC-C should be 35, 85, 175, 500 ...
+
+        try {
+//          std::cerr << "ycsb_worker run a txn "<< std::endl;
+            for(uint64_t i = 0; i < CRDTContext::YCSB_OPs; i ++) {
+                const uint64_t k = r.next() % nkeys;
+                if(k % 100 < CRDTContext::YCSB_Read) {
+                    ALWAYS_ASSERT(tbl->get(txn, u64_varkey(k).str(obj_key0), obj_v));
+                    computation_n += obj_v.size(); /// what does the computation_n used for?
+                }
+                else {
+                    tbl->put(txn, u64_varkey(k).str(str()), str().assign(YCSBRecordSize, 'b'));
+                }
+            }
+            measure_txn_counters(txn, "txn");
+            crdt_txn->exec_time = crdt_txn->t.lap();
+            void* crdt_txn_void = static_cast<void*>(new std::shared_ptr<CRDTTransaction>(std::move(crdt_txn)));
+            db->crdt_commit(txn, shard_id, crdt_txn_void);
+            usleep(10);
+            return txn_result(true, 0);
+        } catch (abstract_db::abstract_abort_exception &ex) {
+            db->abort_txn(txn);
+        }
+        return txn_result(false, 0);
+    }
+
+    static txn_result
+    DoTxn(bench_worker *w)
+    {
+        return static_cast<ycsb_worker *>(w)->do_txn();
+    }
+
   virtual workload_desc_vec
   get_workload() const
   {
@@ -179,14 +242,17 @@ public:
     for (size_t i = 0; i < ARRAY_NELEMS(g_txn_workload_mix); i++)
       m += g_txn_workload_mix[i];
     ALWAYS_ASSERT(m == 100);
-    if (g_txn_workload_mix[0])
-      w.push_back(workload_desc("Read",  double(g_txn_workload_mix[0])/100.0, TxnRead));
-    if (g_txn_workload_mix[1])
-      w.push_back(workload_desc("Write",  double(g_txn_workload_mix[1])/100.0, TxnWrite));
-    if (g_txn_workload_mix[2])
-      w.push_back(workload_desc("ReadModifyWrite",  double(g_txn_workload_mix[2])/100.0, TxnRmw));
-    if (g_txn_workload_mix[3])
-      w.push_back(workload_desc("Scan",  double(g_txn_workload_mix[3])/100.0, TxnScan));
+//    DoTxn
+    w.push_back(workload_desc("DoTxn",  double(1), DoTxn));
+
+//    if (g_txn_workload_mix[0])
+//      w.push_back(workload_desc("Read",  double(g_txn_workload_mix[0])/100.0, TxnRead));
+//    if (g_txn_workload_mix[1])
+//      w.push_back(workload_desc("Write",  double(g_txn_workload_mix[1])/100.0, TxnWrite));
+//    if (g_txn_workload_mix[2])
+//      w.push_back(workload_desc("ReadModifyWrite",  double(g_txn_workload_mix[2])/100.0, TxnRmw));
+//    if (g_txn_workload_mix[3])
+//      w.push_back(workload_desc("Scan",  double(g_txn_workload_mix[3])/100.0, TxnScan));
     return w;
   }
 
@@ -515,5 +581,6 @@ ycsb_do_test(abstract_db *db, int argc, char **argv)
   }
 
   ycsb_bench_runner r(db);
+  std::cerr << "ycsb_bench_runner run" << std::endl;
   r.run();
 }

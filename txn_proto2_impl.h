@@ -10,11 +10,16 @@
 
 #include "txn.h"
 #include "txn_impl.h"
+//addby
+#include "txn_impl_crdt.h"
+
 #include "txn_btree.h"
 #include "macros.h"
 #include "circbuf.h"
 #include "spinbarrier.h"
 #include "record/serializer.h"
+
+
 
 // forward decl
 template <typename Traits> class transaction_proto2;
@@ -696,6 +701,13 @@ protected:
   static event_counter g_evt_proto_gc_delete_requeue;
   static event_avg_counter g_evt_avg_log_entry_size;
   static event_avg_counter g_evt_avg_proto_gc_queue_len;
+
+  //addby
+public:
+    static inline ALWAYS_INLINE
+    percore_lazy<threadctx> &Get_g_threadctxs() {
+        return g_threadctxs;
+    }
 };
 
 bool
@@ -726,20 +738,36 @@ public:
   typedef typename super_type::write_set_map write_set_map;
   typedef typename super_type::write_set_u32_vec write_set_u32_vec;
 
-  transaction_proto2(uint64_t flags,
-                     typename Traits::StringAllocator &sa)
-    : transaction<transaction_proto2, Traits>(flags, sa)
-  {
-    if (this->get_flags() & transaction_base::TXN_FLAG_READ_ONLY) {
-      const uint64_t global_tick_ex =
-        this->rcu_guard_->guard()->impl().global_last_tick_exclusive();
-      u_.last_consistent_tid = ComputeReadOnlyTid(global_tick_ex);
-    }
+//  transaction_proto2(uint64_t flags,
+//                     typename Traits::StringAllocator &sa)
+//    : transaction<transaction_proto2, Traits>(flags, sa)
+//  {
+//    if (this->get_flags() & transaction_base::TXN_FLAG_READ_ONLY) {
+//      const uint64_t global_tick_ex =
+//        this->rcu_guard_->guard()->impl().global_last_tick_exclusive();
+//      u_.last_consistent_tid = ComputeReadOnlyTid(global_tick_ex);
+//    }
+//#ifdef TUPLE_LOCK_OWNERSHIP_CHECKING
+//    dbtuple::TupleLockRegionBegin();
+//#endif
+//    INVARIANT(rcu::s_instance.in_rcu_region());
+//  }
+
+  //addby
+    transaction_proto2(uint64_t flags,
+                       typename Traits::StringAllocator &sa, void *buf = nullptr, CoreIdArena::Node *node = nullptr,
+                       int workerId = 0)
+            : transaction<transaction_proto2, Traits>(flags, sa, buf, node, workerId) {
+        if (this->get_flags() & transaction_base::TXN_FLAG_READ_ONLY) {
+            const uint64_t global_tick_ex =
+                    this->rcu_guard_->guard()->impl().global_last_tick_exclusive();
+            u_.last_consistent_tid = ComputeReadOnlyTid(global_tick_ex);
+        }
 #ifdef TUPLE_LOCK_OWNERSHIP_CHECKING
-    dbtuple::TupleLockRegionBegin();
+            dbtuple::TupleLockRegionBegin();
 #endif
-    INVARIANT(rcu::s_instance.in_rcu_region());
-  }
+        INVARIANT(rcu::s_instance.in_rcu_region());
+    }
 
   ~transaction_proto2()
   {

@@ -36,6 +36,8 @@
 #include "scopedperf.hh"
 #include "marked_ptr.h"
 #include "ndb_type_traits.h"
+#include "coreid_arena.h"
+#include "CRDT/crdt_transaction.h"
 
 // forward decl
 template <template <typename> class Transaction, typename P>
@@ -824,6 +826,65 @@ protected:
   string_allocator_type *sa;
 
   unmanaged<scoped_rcu_region> rcu_guard_;
+
+  //addby
+
+public:
+    inline transaction(uint64_t flags, string_allocator_type &sa, void *buf = nullptr,
+                       CoreIdArena::Node *node = nullptr, int workerId = 0);
+
+    bool crdt_commit(void* txn, int shard_id, void* crdt_txn);
+    bool crdt_record_commit(void* txn, int shard_id, void* crdt_txn);
+
+    inline
+    uint64_t get_csn() {
+        return csn;
+    }
+
+    inline
+    uint64_t get_cen() {
+        return cen;
+    }
+
+    inline int
+    get_workerId() const {
+        return workerId;
+    }
+
+    inline int
+    get_coreId() const {
+        return coreId;
+    }
+
+    inline const uint64_t
+    get_latancy() const {
+        return latancy;
+    }
+
+//private:
+
+    uint64_t tid = 0, sen = 0, cen = 0, csn = 0;
+    std::shared_ptr<std::vector<std::shared_ptr<CRDTTransaction>>> sharded_txn_vec;
+    void *txn_buf;
+    CoreIdArena::Node *node;
+    bool prepare_fail = false;
+    bool merge_fail = false;
+//    crdt_read_set_map crdt_read_set;
+//    dbtuple_write_info_vec write_dbtuples;
+    std::vector<dbtuple_write_info_vec> split_write_dbtuples;
+    std::atomic<int> count{0};
+    int workerId;
+    int coreId;
+
+    util::timer total_t;
+    util::timer wait_prepare_t;
+    util::timer wait_merge_t;
+    util::timer wait_lock_t;
+    util::timer wait_commit_t;
+    util::timer commit_done_t;
+
+    uint64_t latancy;
+
 };
 
 class transaction_abort_exception : public std::exception {

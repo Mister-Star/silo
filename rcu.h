@@ -259,6 +259,10 @@ public:
   // sched.h. note that we currently pin to the numa node
   // associated with the cpu. memory allocation, however, is
   // CPU-specific
+
+    //addby
+    void crdt_pin_thread(size_t cpu);
+
   void pin_current_thread(size_t cpu);
 
   void fault_region();

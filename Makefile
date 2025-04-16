@@ -14,6 +14,7 @@ USE_MALLOC_MODE ?= 1
 MYSQL ?= 1
 MYSQL_SHARE_DIR ?= /x/stephentu/mysql-5.5.29/build/sql/share
 
+
 # Available modes
 #   * perf
 #   * backoff
@@ -75,12 +76,14 @@ else
 	$(error invalid mode)
 endif
 
-CXXFLAGS := -g -Wall -std=c++0x
+#CXXFLAGS := -g -Wall -std=c++0x
+CXXFLAGS := -g -Wall -std=c++17
 CXXFLAGS += -MD -Ithird-party/lz4 -DCONFIG_H=\"$(CONFIG_H)\"
 ifeq ($(DEBUG_S),1)
         CXXFLAGS += -fno-omit-frame-pointer -DDEBUG
 else
-        CXXFLAGS += -Werror -O2 -funroll-loops -fno-omit-frame-pointer
+#        CXXFLAGS += -Werror -O2 -funroll-loops -fno-omit-frame-pointer
+		CXXFLAGS += -O2 -funroll-loops -fno-omit-frame-pointer
 endif
 ifeq ($(CHECK_INVARIANTS_S),1)
 	CXXFLAGS += -DCHECK_INVARIANTS
@@ -124,6 +127,7 @@ endif
 SRCFILES = allocator.cc \
 	btree.cc \
 	core.cc \
+	coreid_arena.cc \
 	counter.cc \
 	memory.cc \
 	rcu.cc \
@@ -134,7 +138,16 @@ SRCFILES = allocator.cc \
 	txn_btree.cc \
 	txn.cc \
 	txn_proto2_impl.cc \
-	varint.cc
+	varint.cc \
+	CRDT/atomic_counters.cc \
+	CRDT/atomic_counters_cache.cc \
+	CRDT/crdt_context.cc \
+	CRDT/crdt_counters.cc \
+	CRDT/crdt_transaction.cc \
+	CRDT/crdt_utils.cc \
+	CRDT/epoch_manager.cc \
+	CRDT/merge.cc \
+	CRDT/tinyxml2.cc \
 
 ifeq ($(MASSTREE_S),1)
 MASSTREE_SRCFILES = masstree/compiler.cc \
