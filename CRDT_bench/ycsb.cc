@@ -166,19 +166,30 @@ public:
     do_txn()
     {
 //        void * const txn = db->new_txn(txn_flags, arena, txn_buf(), abstract_db::HINT_KV_GET_PUT);
-        auto crdt_txn = std::make_shared<CRDTTransaction>(0, 0, 0, 0, nullptr);
 
-        void *buf = malloc(db->sizeof_txn_object(txn_flags));
-        void *const txn = db->new_txn(txn_flags, arena, buf, abstract_db::HINT_KV_TXN);
+
+        void * const txn = db->new_txn(txn_flags, arena, txn_buf(), abstract_db::HINT_KV_TXN);
+//        void *buf = malloc(db->sizeof_txn_object(txn_flags));
+//        void *const txn = db->new_txn(txn_flags, arena, buf, abstract_db::HINT_KV_TXN);
         scoped_str_arena s_arena(arena);
 
+        auto crdt_txn_index = crdt_txn_buffer.get_next_recycle();
+
+        auto sharded_txn_vec = crdt_txn_buffer.GetVec(crdt_txn_index);
+
+        txn->sharded_txn_vec = sharded_txn_vec;
+
+        auto crdt_txn = std::make_shared<CRDTTransaction>();
         crdt_txn->txn = txn;
         crdt_txn->sen = EpochManager::GetLogicalEpoch();
         crdt_txn->tid = now_to_us();
+        crdt_txn->crdt_worker_id = crdt_worker_id;
+        crdt_txn->crdt_txn_id = crdt_txn_index;
+        crdt_txn->row_size = 10; ///for YCSB txn, TPC-C should be 35, 85, 175, 500 ...
 
         try {
-//            std::cerr << "ycsb_worker run a txn "<< std::endl;
-            for(int i = 0; i < CRDTContext::YCSB_OPs; i ++) {
+//          std::cerr << "ycsb_worker run a txn "<< std::endl;
+            for(uint64_t i = 0; i < CRDTContext::YCSB_OPs; i ++) {
                 const uint64_t k = r.next() % nkeys;
                 if(k % 100 < CRDTContext::YCSB_Read) {
                     ALWAYS_ASSERT(tbl->get(txn, u64_varkey(k).str(obj_key0), obj_v));
@@ -189,9 +200,10 @@ public:
                 }
             }
             measure_txn_counters(txn, "txn");
+            crdt_txn->exec_time = crdt_txn->t.lap();
             void* crdt_txn_void = static_cast<void*>(new std::shared_ptr<CRDTTransaction>(std::move(crdt_txn)));
             db->crdt_commit(txn, shard_id, crdt_txn_void);
-//            usleep(50);
+            usleep(10);
             return txn_result(true, 0);
         } catch (abstract_db::abstract_abort_exception &ex) {
             db->abort_txn(txn);

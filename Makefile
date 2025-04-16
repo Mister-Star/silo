@@ -75,9 +75,43 @@ else
 	$(error invalid mode)
 endif
 
+###ADD GLOG
+#GLOG_INCLUDE_DIR := /home/user/glog/install/include
+#GLOG_LIB_DIR := /home/user/glog/install/lib
+
+##install glog
+#export PATH := /usr/local/cmake-3.24.2-linux-x86_64/bin:$(PATH)
+#$(GLOG_INSTALL_DIR)/lib/libglog.a:
+#	@echo "[INFO] 检查 glog 是否已安装..."
+#	@if [ -f "$(GLOG_LIB_FILE)" ]; then \
+#		echo "[INFO] glog 已安装在 $(GLOG_INSTALL_DIR)"; \
+#		exit 0; \
+#	fi
+#	@echo "[INFO] Installing glog..."
+#	@if [ ! -d "$(THIRD_PARTY_DIR)" ]; then \
+#    		echo "[INFO] Creating third-party directory..."; \
+#    		mkdir -p "$(THIRD_PARTY_DIR)"; \
+#    	else \
+#    		echo "[INFO] third-party directory already exists."; \
+#    	fi
+#	@if [ ! -d "$(GLOG_DIR)/.git" ]; then \
+#		echo "[INFO] Cloning glog into $(THIRD_PARTY_DIR)..."; \
+#		cd $(THIRD_PARTY_DIR) && git clone https://github.com/google/glog.git; \
+#	else \
+#		echo "[INFO] glog already cloned."; \
+#	fi
+#	if [ ! -d "$(GLOG_DIR)/build" ]; then mkdir -p $(GLOG_DIR)/build; fi && \
+#	cd $(GLOG_DIR)/build && \
+#	cmake -DCMAKE_INSTALL_PREFIX=$(abspath $(GLOG_INSTALL_DIR)) .. && \
+#	make -j$(shell nproc) && make install
+#
+#.PHONY: glog-install
+#glog-install: $(GLOG_INSTALL_DIR)/lib/libglog.a
+
 #CXXFLAGS := -g -Wall -std=c++0x
-CXXFLAGS := -g -Wall -std=c++14
+CXXFLAGS := -g -Wall -std=c++17
 CXXFLAGS += -MD -Ithird-party/lz4 -DCONFIG_H=\"$(CONFIG_H)\"
+#CXXFLAGS += -I$(GLOG_INCLUDE_DIR)
 ifeq ($(DEBUG_S),1)
         CXXFLAGS += -fno-omit-frame-pointer -DDEBUG
 else
@@ -101,8 +135,10 @@ endif
 
 TOP     := $(shell echo $${PWD-`pwd`})
 LDFLAGS := -lpthread -lnuma -lrt
+#LDFLAGS := -L$(GLOG_LIB_DIR)/lib -lglog -lpthread -lnuma -lrt
 
 LZ4LDFLAGS := -Lthird-party/lz4 -llz4 -Wl,-rpath,$(TOP)/third-party/lz4
+#LZ4LDFLAGS := -Lthird-party/lz4 -llz4 -Wl,-rpath,$(TOP)/third-party/lz4 -L$(GLOG_LIB_DIR)/lib -lglog -lpthread
 
 ifeq ($(USE_MALLOC_MODE_S),1)
         CXXFLAGS+=-DUSE_JEMALLOC
@@ -139,15 +175,15 @@ SRCFILES = allocator.cc \
 	txn.cc \
 	txn_proto2_impl.cc \
 	varint.cc \
-	CRDT/atomic_counters.cpp \
-	CRDT/atomic_counters_cache.cpp \
-	CRDT/crdt_context.cpp \
-	CRDT/crdt_counters.cpp \
-	CRDT/crdt_transaction.cpp \
-	CRDT/crdt_utils.cpp \
-	CRDT/merge.cpp \
-	CRDT/epoch_manager.cpp \
-	CRDT/tinyxml2.cpp \
+	CRDT/atomic_counters.cc \
+	CRDT/atomic_counters_cache.cc \
+	CRDT/crdt_context.cc \
+	CRDT/crdt_counters.cc \
+	CRDT/crdt_transaction.cc \
+	CRDT/crdt_utils.cc \
+	CRDT/merge.cc \
+	CRDT/epoch_manager.cc \
+	CRDT/tinyxml2.cc \
 
 
 ifeq ($(MASSTREE_S),1)
@@ -159,7 +195,6 @@ MASSTREE_SRCFILES = masstree/compiler.cc \
 endif
 
 OBJFILES := $(patsubst %.cc, $(O)/%.o, $(SRCFILES))
-#OBJFILES := $(patsubst %.cc, $(O)/%.o, $(filter %.cc, $(SRCFILES))) $(patsubst %.cpp, $(O)/%.o, $(filter %.cpp, $(SRCFILES)))
 
 MASSTREE_OBJFILES := $(patsubst masstree/%.cc, $(O)/%.o, $(MASSTREE_SRCFILES))
 

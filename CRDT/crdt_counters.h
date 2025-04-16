@@ -17,9 +17,9 @@ public:
     static uint64_t max_length, shard_num;
     static std::atomic<uint64_t> inc_id;
 
-    static bool StaticInit();
-    static bool StaticInitShard(uint64_t& shard);
-    static bool StaticClear(uint64_t& epoch);
+    static void StaticInit();
+    static void StaticInitShard(uint64_t& shard);
+    static void StaticClear(uint64_t& epoch);
 
 public:
     ///epoch manager access all shard counters
@@ -33,12 +33,19 @@ public:
             epoch_record_commit_txn_num_vec,
             epoch_record_committed_txn_num_vec,
             epoch_result_return_txn_num_vec,
-            epoch_result_returned_txn_num_vec,
+            epoch_result_returned_txn_num_vec;
 
+    static std::vector<std::shared_ptr<std::atomic<uint64_t>>> ///shard
+            total_exec_txn_num_vec,
+            total_exec_latency_vec,
+            total_read_validate_txn_num_vec,
+            total_read_validate_latency_vec,
             total_merge_txn_num_vec,
             total_merge_latency_vec,
             total_commit_txn_num_vec,
             total_commit_latency_vec,
+            total_result_return_txn_num_vec,
+            total_result_return_latency_vec,
             success_commit_txn_num_vec,
             success_commit_latency_vec,
             total_read_version_check_failed_txn_num_vec,

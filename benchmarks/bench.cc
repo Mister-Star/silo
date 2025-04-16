@@ -16,6 +16,8 @@
 #include "../scopedperf.hh"
 #include "../allocator.h"
 
+#include "../CRDT/crdt_context.h"
+
 #ifdef USE_JEMALLOC
 //cannot include this header b/c conflicts with malloc.h
 //#include <jemalloc/jemalloc.h>
@@ -128,6 +130,7 @@ bench_worker::run()
         timer t;
         const unsigned long old_seed = r.get_seed();
         const auto ret = workload[i].fn(this);
+          std::cerr << "bench run a txn result " << ret.first << std::endl;
         if (likely(ret.first)) {
           ++ntxn_commits;
           latency_numer_us += t.lap();
@@ -164,6 +167,11 @@ bench_worker::run()
 void
 bench_runner::run()
 {
+    std::cerr << "bench_runner GetCRDTConfig" << std::endl;
+    CRDTContext::GetCRDTConfig();
+    CRDTContext::kNKeys = size_t(scale_factor * 1000.0);
+
+    std::cerr << "======== benchmark data load start  ============" << std::endl;
   // load data
   const vector<bench_loader *> loaders = make_loaders();
   {
@@ -186,6 +194,8 @@ bench_runner::run()
     if (verbose)
       cerr << "DB size: " << delta_mb << " MB" << endl;
   }
+
+    std::cerr << "======== benchmark data load finish  ============" << std::endl;
 
   db->do_txn_epoch_sync(); // also waits for worker threads to be persisted
   {
@@ -223,6 +233,8 @@ bench_runner::run()
     }
     cerr << "starting benchmark..." << endl;
   }
+
+  std::cerr << "======== start benchmark ============" << std::endl;
 
   const pair<uint64_t, uint64_t> mem_info_before = get_system_memory_info();
 

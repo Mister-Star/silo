@@ -75,6 +75,8 @@ public:
     std::shared_ptr<CRDTTransaction> txn_ptr;
     bool result, sleep_flag;
 
+    std::shared_ptr<std::vector<std::shared_ptr<CRDTTransaction>>> epoch_sharded_txn_ptr;
+
             ///each merge thread access local counter
     std::shared_ptr<AtomicCounters>///[epoch]
         epoch_should_read_validate_txn_num_shard,
@@ -88,11 +90,17 @@ public:
         epoch_result_return_txn_num_shard,
         epoch_result_returned_txn_num_shard;
 
-    std::shared_ptr<AtomicCounters>///[epoch]
+    std::shared_ptr<std::atomic<uint64_t>>///[epoch]
+        total_exec_txn_num_shard,
+        total_exec_latency_shard,
+        total_read_validate_txn_num_shard,
+        total_read_validate_latency_shard,
         total_merge_txn_num_shard,
         total_merge_latency_shard,
         total_commit_txn_num_shard,
         total_commit_latency_shard,
+        total_result_return_txn_num_shard,
+        total_result_return_latency_shard,
         success_commit_txn_num_shard,
         success_commit_latency_shard,
         total_read_version_check_failed_txn_num_shard,

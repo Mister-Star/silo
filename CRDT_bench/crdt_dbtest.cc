@@ -23,6 +23,9 @@
 #include "mysql_wrapper.h"
 #endif
 
+
+//#include <glog/logging.h>
+
 using namespace std;
 using namespace util;
 

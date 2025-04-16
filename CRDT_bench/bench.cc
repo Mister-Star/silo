@@ -107,6 +107,10 @@ write_cb(void *p, const char *s)
 
 static event_avg_counter evt_avg_abort_spins("avg_abort_spins");
 
+std::atomic<uint64_t> worker_num(0);
+
+
+
 void
 bench_worker::run()
 {
@@ -117,6 +121,8 @@ bench_worker::run()
   {
     scoped_rcu_region r; // register this thread in rcu region
   }
+  crdt_worker_id = worker_num.fetch_add(1);
+
   on_run_setup();
   scoped_db_thread_ctx ctx(db, false);
   const workload_desc_vec workload = get_workload();
@@ -128,6 +134,9 @@ bench_worker::run()
   pthread_setname_np(pthread_self(), name.substr(0, 15).c_str());
 
   shard_id = worker_id % CRDTContext::kShardNum;
+
+  crdt_txn_buffer.Init(CRDTContext::kTxnRowSize, CRDTContext::kShardNum, 24);
+
   auto crdt_txn = std::make_shared<CRDTTransaction>();
   while(! EpochManager::IsShardInitOK()) std::this_thread::yield();
 
@@ -169,8 +178,7 @@ bench_worker::run()
       }
       d -= workload[i].frequency;
     }
-    if (Merge::epoch_result_returned_queue_vec[shard_id]->try_dequeue(crdt_txn)) {
-//        coreid::set_core_id_andnocheck(db->get_coreId(txn));
+    if (Merge::epoch_result_returned_queue_vec[crdt_worker_id]->try_dequeue(crdt_txn)) {
         if(crdt_txn->result) {
             ++ntxn_commits;
           latency_numer_us += crdt_txn->t.lap();
@@ -179,13 +187,11 @@ bench_worker::run()
         else {
             ++ntxn_aborts;
         }
-        db->destroy_txn(crdt_txn->txn, worker_id);
-//        crdt_txn->read_set;
+//        db->destroy_txn(crdt_txn->txn, worker_id);
     }
   }
 
-    while (Merge::epoch_result_returned_queue_vec[shard_id]->try_dequeue(crdt_txn)) {
-//        coreid::set_core_id_andnocheck(db->get_coreId(txn));
+    while (Merge::epoch_result_returned_queue_vec[crdt_worker_id]->try_dequeue(crdt_txn)) {
         if(crdt_txn->result) {
             ++ntxn_commits;
             latency_numer_us += crdt_txn->t.lap();
@@ -194,8 +200,7 @@ bench_worker::run()
         else {
             ++ntxn_aborts;
         }
-        db->destroy_txn(crdt_txn->txn, worker_id);
-//        crdt_txn->read_set;
+//        db->destroy_txn(crdt_txn->txn, worker_id);
     }
 }
 
@@ -205,6 +210,9 @@ bench_runner::run()
     std::cerr << "bench_runner GetCRDTConfig" << std::endl;
     CRDTContext::GetCRDTConfig();
     CRDTContext::kNKeys = size_t(scale_factor * 1000.0);
+    CRDTContext::kWorkerThreadNum = nthreads;
+
+    std::cerr << "kNKeys " << CRDTContext::kNKeys << " kWorkerThreadNum " << CRDTContext::kWorkerThreadNum << std::endl;
 
     std::vector<std::shared_ptr<std::thread>> merge_threads;
     merge_threads.emplace_back(std::make_shared<std::thread>(EpochPhysicalTimerManagerThreadMain));

@@ -28,44 +28,44 @@ public:
     void Init(uint64_t size = 8);
 
     uint64_t IncCount(const uint64_t &index, const uint64_t &value) {
-        return vec[index % _size]->fetch_add(value);
+        return vec[index % _size]->fetch_add(value, std::memory_order_release);
     }
 
     uint64_t DecCount(const uint64_t &index, const uint64_t &value) {
-        return vec[index % _size]->fetch_sub(value);
+        return vec[index % _size]->fetch_sub(value, std::memory_order_release);
     }
 
     void SetCount(const uint64_t &value) {
         for (auto &i: vec) {
-            i->store(value);
+            i->store(value, std::memory_order_release);
         }
     }
 
     void SetCount(const uint64_t &index, const uint64_t &value) {
-        vec[index % _size]->store(value);
+        vec[index % _size]->store(value, std::memory_order_release);
     }
 
     uint64_t GetCount() {
         uint64_t ans = 0;
         for (auto &i: vec) {
-            ans += i->load();
+            ans += i->load(std::memory_order_acquire);
         }
         return ans;
     }
 
     uint64_t GetCount(const uint64_t &index) {
-        return vec[index % _size]->load();
+        return vec[index % _size]->load(std::memory_order_acquire);
     }
 
     void ClearAll(const uint64_t value = 0) {
         (void) value;
         for (auto &i: vec) {
-            i->store(0);
+            i->store(0, std::memory_order_release);
         }
     }
 
     void Clear(const uint64_t &index) {
-        vec[index % _size]->store(0);
+        vec[index % _size]->store(0, std::memory_order_release);
     }
 
     void Resize(const uint64_t &size) {

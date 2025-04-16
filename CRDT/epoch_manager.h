@@ -43,7 +43,7 @@ void OUTPUTLOG(const std::string& s, uint64_t& epoch);
 class EpochManager {
 public:
     static bool timerStop;
-    static std::atomic<uint64_t> logical_epoch, physical_epoch, push_down_epoch;
+    static volatile std::atomic<uint64_t> logical_epoch, physical_epoch, push_down_epoch;
     static uint64_t max_length;
 
 public:
@@ -57,51 +57,51 @@ public:
     static void SetTimerStop(bool value) {timerStop = value;}
     static bool IsTimerStop() {return timerStop;}
 
-    static bool IsEpochMergeComplete(uint64_t epoch) {return merge_complete[epoch % max_length]->load();}
-    static void SetEpochMergeComplete(uint64_t epoch, bool value) {merge_complete[epoch % max_length]->store(value);}
+    static bool IsEpochMergeComplete(uint64_t epoch) {return merge_complete[epoch % max_length]->load(std::memory_order_acquire);}
+    static void SetEpochMergeComplete(uint64_t epoch, bool value) {merge_complete[epoch % max_length]->store(value, std::memory_order_release);}
 
-    static bool IsAbortSetMergeComplete(uint64_t epoch) {return abort_set_merge_complete[epoch % max_length]->load();}
-    static void SetAbortSetMergeComplete(uint64_t epoch, bool value) {abort_set_merge_complete[epoch % max_length]->store(value);}
+    static bool IsAbortSetMergeComplete(uint64_t epoch) {return abort_set_merge_complete[epoch % max_length]->load(std::memory_order_acquire);}
+    static void SetAbortSetMergeComplete(uint64_t epoch, bool value) {abort_set_merge_complete[epoch % max_length]->store(value, std::memory_order_release);}
 
-    static bool IsCommitComplete(uint64_t epoch) {return commit_complete[epoch % max_length]->load();}
-    static void SetCommitComplete(uint64_t epoch, bool value) {commit_complete[epoch % max_length]->store(value);}
+    static bool IsCommitComplete(uint64_t epoch) {return commit_complete[epoch % max_length]->load(std::memory_order_acquire);}
+    static void SetCommitComplete(uint64_t epoch, bool value) {commit_complete[epoch % max_length]->store(value, std::memory_order_release);}
 
-    static bool IsRecordCommitted(uint64_t epoch){ return record_committed[epoch % max_length]->load();}
-    static void SetRecordCommitted(uint64_t epoch, bool value){ record_committed[epoch % max_length]->store(value);}
+    static bool IsRecordCommitted(uint64_t epoch){ return record_committed[epoch % max_length]->load(std::memory_order_acquire);}
+    static void SetRecordCommitted(uint64_t epoch, bool value){ record_committed[epoch % max_length]->store(value, std::memory_order_release);}
 
-    static bool IsResultReturned(uint64_t epoch){ return result_returned[epoch % max_length]->load();}
-    static void SetResultReturned(uint64_t epoch, bool value){ result_returned[epoch % max_length]->store(value);}
+    static bool IsResultReturned(uint64_t epoch){ return result_returned[epoch % max_length]->load(std::memory_order_acquire);}
+    static void SetResultReturned(uint64_t epoch, bool value){ result_returned[epoch % max_length]->store(value, std::memory_order_release);}
 
-    static bool IsCurrentEpochAbort(uint64_t epoch){ return is_current_epoch_abort[epoch % max_length]->load();}
-    static void SetCurrentEpochAbort(uint64_t epoch, bool value){ is_current_epoch_abort[epoch % max_length]->store(value);}
+    static bool IsCurrentEpochAbort(uint64_t epoch){ return is_current_epoch_abort[epoch % max_length]->load(std::memory_order_acquire);}
+    static void SetCurrentEpochAbort(uint64_t epoch, bool value){ is_current_epoch_abort[epoch % max_length]->store(value, std::memory_order_release);}
 
-    static void SetPhysicalEpoch(uint64_t value){ physical_epoch.store(value);}
+    static void SetPhysicalEpoch(uint64_t value){ physical_epoch.store(value, std::memory_order_release);}
     static uint64_t AddPhysicalEpoch(){
-        return physical_epoch.fetch_add(1);
+        return physical_epoch.fetch_add(1, std::memory_order_release);
     }
-    static uint64_t GetPhysicalEpoch(){ return physical_epoch.load();}
+    static uint64_t GetPhysicalEpoch(){ return physical_epoch.load(std::memory_order_acquire);}
 
-    static void SetLogicalEpoch(uint64_t value){ logical_epoch.store(value);}
+    static void SetLogicalEpoch(uint64_t value){ logical_epoch.store(value, std::memory_order_release);}
     static uint64_t AddLogicalEpoch(){
-        return logical_epoch.fetch_add(1);
+        return logical_epoch.fetch_add(1, std::memory_order_release);
     }
-    static uint64_t GetLogicalEpoch(){ return logical_epoch.load();}
+    static uint64_t GetLogicalEpoch(){ return logical_epoch.load(std::memory_order_acquire);}
 
-    static void SetPushDownEpoch(uint64_t value){ push_down_epoch.store(value);}
+    static void SetPushDownEpoch(uint64_t value){ push_down_epoch.store(value, std::memory_order_release);}
     static uint64_t AddPushDownEpoch(){
-        return push_down_epoch.fetch_add(1);
+        return push_down_epoch.fetch_add(1, std::memory_order_release);
     }
-    static uint64_t GetPushDownEpoch(){ return push_down_epoch.load();}
+    static uint64_t GetPushDownEpoch(){ return push_down_epoch.load(std::memory_order_acquire);}
 
 
     static void ClearMergeEpochState(uint64_t& epoch) {
         auto epoch_mod = epoch %  max_length;
-        merge_complete[epoch_mod]->store(false);
-        abort_set_merge_complete[epoch_mod]->store(false);
-        commit_complete[epoch_mod]->store(false);
-        record_committed[epoch_mod]->store(false);
-        result_returned[epoch_mod]->store(false);
-        is_current_epoch_abort[epoch_mod]->store(false);
+        merge_complete[epoch_mod]->store(false, std::memory_order_release);
+        abort_set_merge_complete[epoch_mod]->store(false, std::memory_order_release);
+        commit_complete[epoch_mod]->store(false, std::memory_order_release);
+        record_committed[epoch_mod]->store(false, std::memory_order_release);
+        result_returned[epoch_mod]->store(false, std::memory_order_release);
+        is_current_epoch_abort[epoch_mod]->store(false, std::memory_order_release);
     }
 
     static void EpochCacheSafeCheck() {

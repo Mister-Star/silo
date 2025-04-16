@@ -10,7 +10,7 @@
 using namespace std;
 
 bool EpochManager::timerStop = false;
-std::atomic<uint64_t> EpochManager::logical_epoch(1), EpochManager::physical_epoch(0), EpochManager::push_down_epoch(1);
+volatile std::atomic<uint64_t> EpochManager::logical_epoch(1), EpochManager::physical_epoch(0), EpochManager::push_down_epoch(1);
 uint64_t EpochManager::max_length = 10000;
 //epoch merge state
 std::vector<std::unique_ptr<std::atomic<bool>>> EpochManager::merge_complete, EpochManager::abort_set_merge_complete,
@@ -28,8 +28,8 @@ std::atomic<bool> is_epoch_advance_started(false), test_start(false);
 
 uint64_t last_total_commit_txn_num = 0, total_commit_txn_num = 0;
 const uint64_t sleep_time = 10, logical_sleep_timme = 10, storage_sleep_time = 10, merge_sleep_time = 10, message_sleep_time = 10;
-std::atomic<uint64_t> merge_epoch = 1, abort_set_epoch = 1,
-        commit_epoch = 1, redo_log_epoch = 1, clear_epoch = 1;
+std::atomic<uint64_t> merge_epoch(1), abort_set_epoch(1),
+        commit_epoch(1), redo_log_epoch(1), clear_epoch(1);
 
 void InitEpochTimerManager(){
     std::cerr << "EpochPhysicalThread start StaticEpochInit  " << std::endl;

@@ -4,6 +4,7 @@
 #include "txn.h"
 #include "lockguard.h"
 #include "CRDT/epoch_manager.h"
+#include "util.h"
 
 // addby
 
@@ -33,22 +34,29 @@ transaction<Protocol, Traits>::crdt_commit(void* txn, int shard_id, void* crdt_t
 
     auto* temp_crdt_txn_ptr = static_cast<std::shared_ptr<CRDTTransaction>*>(crdt_txn);
     auto crdt_txn_ptr = *temp_crdt_txn_ptr;
+    crdt_txn_ptr->crdt_txn = crdt_txn_ptr;
+    auto epoch_txn_id = 0;
+
     ///sharding
-    std::vector<std::shared_ptr<CRDTTransaction>> sharded_read_txn, sharded_write_txn;
-    sharded_read_txn.reserve(CRDTContext::kShardNum);
-    sharded_write_txn.reserve(CRDTContext::kShardNum);
+    std::vector<std::shared_ptr<CRDTTransaction>> sharded_txn;
+    sharded_txn.reserve(CRDTContext::kShardNum);
+
+    {
+        cen = EpochManager::GetPhysicalEpoch();
+        epoch_txn_id = CRDTCounters::IncEpochShouldExecTxnNum(cen, 1);
+        crdt_txn_ptr->cen = cen;
+        crdt_txn_ptr->csn = now_to_us();
+    }
+
     for(uint64_t i = 0; i < CRDTContext::kShardNum; i ++) {
-        sharded_read_txn.emplace_back(std::make_shared<CRDTTransaction>());
-
-        sharded_read_txn[i]->sen = crdt_txn_ptr->sen;
-        sharded_read_txn[i]->tid = crdt_txn_ptr->tid;
-        sharded_read_txn[i]->txn = crdt_txn_ptr->txn;
-
-        sharded_write_txn.emplace_back(std::make_shared<CRDTTransaction>());
-
-        sharded_write_txn[i]->sen = crdt_txn_ptr->sen;
-        sharded_write_txn[i]->tid = crdt_txn_ptr->tid;
-        sharded_write_txn[i]->txn = crdt_txn_ptr->txn;
+        sharded_txn[i] = (*Merge::epoch_sharded_txn_vec[i])[epoch_txn_id];
+        sharded_txn[i]->sen = crdt_txn_ptr->sen;
+        sharded_txn[i]->tid = crdt_txn_ptr->tid;
+        sharded_txn[i]->txn = crdt_txn_ptr->txn;
+        sharded_txn[i]->cen = crdt_txn_ptr->cen;
+        sharded_txn[i]->csn = crdt_txn_ptr->csn;
+        sharded_txn[i]->read_set.clear();
+        sharded_txn[i]->write_set.clear();
     }
 
     const uint64_t MAX_KEY = CRDTContext::kNKeys;
@@ -58,8 +66,7 @@ transaction<Protocol, Traits>::crdt_commit(void* txn, int shard_id, void* crdt_t
         ///sharded_read_txn
         auto tuple = it.get_tuple();
         auto shard = (tuple->keyNum / range_per_queue) % CRDTContext::kShardNum;
-        ///todo: 将sharded_read_txn 写到对应的内存，而非当前线程存在的NUMA内存
-        sharded_read_txn[shard]->read_set.emplace(
+        sharded_txn[shard]->read_set.emplace_back(
                 std::make_pair(tuple->index_key,
                                std::move(CRDTRow(tuple->stable_csn, OpType::Read))));
     }
@@ -70,9 +77,7 @@ transaction<Protocol, Traits>::crdt_commit(void* txn, int shard_id, void* crdt_t
         auto shard = (tuple->keyNum / range_per_queue) % CRDTContext::kShardNum;
         //todo: op_type
         // if(tuple->op_type == update)
-
-        ///todo: 将sharded_read_txn 写到对应的内存，而非当前线程存在的NUMA内存
-        sharded_read_txn[shard]->read_set.emplace(
+        sharded_txn[shard]->read_set.emplace_back(
                 std::make_pair(tuple->index_key,
                                std::move(CRDTRow(tuple->stable_csn, OpType::Update,
                                                  tuple->index_key,
@@ -80,31 +85,20 @@ transaction<Protocol, Traits>::crdt_commit(void* txn, int shard_id, void* crdt_t
                                                              , tuple->size)))));
     }
 
-    auto cen = EpochManager::GetPhysicalEpoch();
-    CRDTCounters::IncEpochShouldExecTxnNum(cen, 1);
-    crdt_txn_ptr->cen = cen;
-    crdt_txn_ptr->csn = now_to_us();
-
-    for(uint64_t i = 0; i < CRDTContext::kShardNum; i ++) {
-        sharded_read_txn[i]->cen = crdt_txn_ptr->cen;
-        sharded_read_txn[i]->csn = crdt_txn_ptr->csn;
-
-        sharded_write_txn[i]->cen = crdt_txn_ptr->cen;
-        sharded_write_txn[i]->csn = crdt_txn_ptr->csn;
+    {
+        //Enqueue
+    //    std::cerr << "crdt_commit enqueue sharded_txn cen" << cen << std::endl;
+        for(uint64_t i = 0; i < CRDTContext::kShardNum; i ++) {
+            Merge::ReadValidateQueueEnqueue(i, cen, CRDTContext::kCacheMaxLength, sharded_txn[i]);
+            Merge::MergeQueueEnqueue(i, cen, CRDTContext::kCacheMaxLength, sharded_txn[i]);
+            Merge::CommitQueueEnqueue(i, cen, CRDTContext::kCacheMaxLength, sharded_txn[i]);
+        }
+        Merge::ResultReturnQueueEnqueue(shard_id, cen, CRDTContext::kCacheMaxLength, crdt_txn_ptr);
     }
 
-    //Enqueue
-//    std::cerr << "crdt_commit enqueue sharded_txn cen" << cen << std::endl;
-    for(uint64_t i = 0; i < CRDTContext::kShardNum; i ++) {
-        Merge::ReadValidateQueueEnqueue(i, cen, CRDTContext::kCacheMaxLength, sharded_read_txn[i]);
-        Merge::MergeQueueEnqueue(i, cen, CRDTContext::kCacheMaxLength, sharded_write_txn[i]);
-        Merge::CommitQueueEnqueue(i, cen, CRDTContext::kCacheMaxLength, sharded_write_txn[i]);
-    }
-    Merge::ResultReturnQueueEnqueue(shard_id, cen, CRDTContext::kCacheMaxLength, crdt_txn_ptr);
     CRDTCounters::IncEpochExecTxnNum(cen, 1);
-    /// wait for epoch_result_returned_queue_vec[shard] to dequeue the result;
-
-    delete temp_crdt_txn_ptr;
+    crdt_txn_ptr->shrad_time = crdt_txn_ptr->t.lap();
+//    delete temp_crdt_txn_ptr; /// no personal malloc initialized; all use std::shared_ptr
 
     return true;
 }

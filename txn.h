@@ -37,6 +37,7 @@
 #include "marked_ptr.h"
 #include "ndb_type_traits.h"
 #include "coreid_arena.h"
+#include "CRDT/crdt_transaction.h"
 
 // forward decl
 template <template <typename> class Transaction, typename P>
@@ -863,7 +864,7 @@ public:
 //private:
 
     uint64_t tid = 0, sen = 0, cen = 0, csn = 0;
-    void *txn_buf;
+    std::shared_ptr<std::vector<std::shared_ptr<CRDTTransaction>>> sharded_txn_vec;
     CoreIdArena::Node *node;
     bool prepare_fail = false;
     bool merge_fail = false;

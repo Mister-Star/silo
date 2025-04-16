@@ -25,7 +25,7 @@ public:
             kShardNum, kNKeys, kWorkerThreadNum, kMergeThreadNum;
     static IsolationLevel kCRDTIsolation;
     static uint64_t YCSB_OPs, YCSB_Read, YCSB_Write;
-
+    static uint64_t kInitTxnNum, kTxnRowSize;
     static void GetCRDTConfig();
 };
 

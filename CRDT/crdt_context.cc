@@ -13,6 +13,7 @@ uint64_t CRDTContext::kEpochSize_us = 1000000 /** us */, CRDTContext::kCacheMaxL
         CRDTContext::kMergeThreadNum = 1;
 IsolationLevel CRDTContext::kCRDTIsolation = IsolationLevel::SI;
 uint64_t CRDTContext::YCSB_OPs = 10, CRDTContext::YCSB_Read = 80, CRDTContext::YCSB_Write = 20;
+uint64_t CRDTContext::kInitTxnNum = 100, CRDTContext::kTxnRowSize = 10;
 
 namespace fs = std::filesystem;
 
@@ -69,4 +70,8 @@ void CRDTContext::GetCRDTConfig(){
     tinyxml2::XMLElement* ycsb_write = root->FirstChildElement("ycsb_write");
     YCSB_Write = std::stoull(ycsb_write->GetText());
 
+    tinyxml2::XMLElement* init_txn_num = root->FirstChildElement("init_txn_num");
+    kInitTxnNum = std::stoull(init_txn_num->GetText());
+    tinyxml2::XMLElement* txn_row_size = root->FirstChildElement("txn_row_size");
+    kTxnRowSize = std::stoull(txn_row_size->GetText());
 }

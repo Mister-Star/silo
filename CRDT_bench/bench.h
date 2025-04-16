@@ -15,6 +15,8 @@
 #include "../spinbarrier.h"
 #include "../rcu.h"
 
+#include "../CRDT/crdt_transaction.h"
+
 extern void ycsb_do_test(abstract_db *db, int argc, char **argv);
 extern void tpcc_do_test(abstract_db *db, int argc, char **argv);
 extern void queue_do_test(abstract_db *db, int argc, char **argv);
@@ -177,7 +179,7 @@ protected:
 
   inline void *txn_buf() { return (void *) txn_obj_buf.data(); }
 
-  unsigned int worker_id, shard_id;
+  unsigned int worker_id, shard_id, crdt_worker_id;
   bool set_core_id;
   util::fast_random r;
   abstract_db *const db;
@@ -205,6 +207,9 @@ protected:
 
   std::string txn_obj_buf;
   str_arena arena;
+
+  ///addby
+  CRDTRingBuffer crdt_txn_buffer;
 };
 
 class bench_runner {
