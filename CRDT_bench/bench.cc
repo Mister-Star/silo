@@ -133,6 +133,8 @@ bench_worker::run()
   std::string name = "BenchWorker" + std::to_string(worker_id);
   pthread_setname_np(pthread_self(), name.substr(0, 15).c_str());
 
+  ///todo: single thread role implementation
+
   shard_id = worker_id % CRDTContext::kShardNum;
 
   crdt_txn_buffer.Init(CRDTContext::kTxnRowSize, CRDTContext::kShardNum, 24);
